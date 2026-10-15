@@ -1,0 +1,1436 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Дневник стажёра</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Unbounded:wght@500;600&display=swap">
+<style>
+/* Layout: one working column per tab — form + side progress for the broker, period bar + team table + drill-down for the ROP */
+:root {
+  --bg: #F2F4F1;
+  --surface: #FFFFFF;
+  --surface-2: #E9ECE7;
+  --line: #D6DBD4;
+  --ink: #18211D;
+  --muted: #5E6862;
+  --accent: #1D5C63;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #DCEAE9;
+  --good: #2E7A4D;
+  --good-soft: #DCEEE2;
+  --warn: #A3670F;
+  --warn-soft: #F5E8D0;
+  --bad: #B03A32;
+  --bad-soft: #F5DCD9;
+  --f-display: "Unbounded", "Golos Text", system-ui, sans-serif;
+  --f-body: "Golos Text", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101513; --surface: #171E1B; --surface-2: #1F2824; --line: #2C3732;
+    --ink: #E6ECE8; --muted: #98A49D; --accent: #6DB5BB; --accent-ink: #0B1819; --accent-soft: #1C383B;
+    --good: #6BBE8A; --good-soft: #1B3326; --warn: #DFA64C; --warn-soft: #382B16; --bad: #EC7A70; --bad-soft: #3B1F1C;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101513; --surface: #171E1B; --surface-2: #1F2824; --line: #2C3732;
+  --ink: #E6ECE8; --muted: #98A49D; --accent: #6DB5BB; --accent-ink: #0B1819; --accent-soft: #1C383B;
+  --good: #6BBE8A; --good-soft: #1B3326; --warn: #DFA64C; --warn-soft: #382B16; --bad: #EC7A70; --bad-soft: #3B1F1C;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+img { max-width: 100%; }
+.import { display: grid; gap: 10px; }
+.import .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.drop { outline: 2px dashed var(--accent); outline-offset: 4px; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--f-body); }
+.app { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 64px; display: grid; gap: 18px; }
+@media (min-width: 720px) { .app { padding-inline: 28px; } }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+h1 { font: 600 22px/1.15 var(--f-display); letter-spacing: -0.01em; }
+h2 { font: 600 17px/1.25 var(--f-body); }
+h3 { font: 600 14px/1.3 var(--f-body); }
+.muted { color: var(--muted); }
+.num, td, .t-val { font-variant-numeric: tabular-nums; }
+.eyebrow { font: 500 11px/1.2 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+button, input, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* header */
+.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 14px; }
+.brand { display: grid; gap: 4px; min-width: 0; }
+.who { margin: 0; color: var(--muted); font-size: 13px; }
+.tabs { display: flex; gap: 4px; background: var(--surface-2); padding: 4px; border-radius: 999px; max-width: 100%; overflow-x: auto; }
+.tabs button { border: 0; background: transparent; padding: 7px 16px; border-radius: 999px; cursor: pointer; white-space: nowrap; font-weight: 500; color: var(--muted); }
+.tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+
+.notice { background: var(--warn-soft); color: var(--ink); border-radius: var(--r); padding: 12px 16px; font-size: 14px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; min-width: 0; }
+.view { display: grid; gap: 16px; }
+
+/* buttons */
+.btn { border: 1px solid var(--line); background: var(--surface); padding: 9px 16px; border-radius: 8px; cursor: pointer; font-weight: 500; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.ghost { background: transparent; }
+.btn.sm { padding: 6px 12px; font-size: 13px; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.icon-btn { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-size: 18px; line-height: 1; display: inline-grid; place-items: center; }
+.icon-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* day view */
+.day-grid { display: grid; gap: 16px; }
+@media (min-width: 900px) { .day-grid { grid-template-columns: minmax(0, 1fr) 330px; align-items: start; } }
+.form-card { display: grid; gap: 16px; }
+.week-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.week-title { font-weight: 500; }
+.strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 8px 2px 7px; display: grid; justify-items: center; gap: 2px; cursor: pointer; min-width: 0; }
+.chip .wd { font: 500 11px/1 var(--f-mono); text-transform: uppercase; color: var(--muted); letter-spacing: .04em; }
+.chip .dn { font: 600 17px/1.2 var(--f-display); }
+.chip .dot { width: 6px; height: 6px; border-radius: 50%; background: transparent; }
+.chip.filled .dot { background: var(--good); }
+.chip.off .dot { background: var(--muted); }
+.chip.missing .dot { background: var(--bad); }
+.chip.today { border-color: var(--accent); }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.chip[aria-pressed="true"] .wd { color: var(--accent-ink); opacity: .8; }
+.chip:disabled { opacity: .35; cursor: not-allowed; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; background: var(--c); }
+
+.form-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.off-toggle { display: flex; gap: 10px; align-items: center; font-size: 14px; cursor: pointer; }
+.off-toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
+fieldset { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: 18px; }
+fieldset:disabled .grp { opacity: .45; }
+.grp { display: grid; gap: 10px; }
+.grp-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.fld { display: grid; gap: 6px; min-width: 0; }
+.fld > span { font-size: 13px; color: var(--muted); }
+.stepper { display: grid; grid-template-columns: 38px minmax(0, 1fr) 38px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.stepper button { border: 0; background: var(--surface-2); cursor: pointer; font-size: 18px; }
+.stepper button:hover { background: var(--accent-soft); }
+.stepper input, .money input { border: 0; background: transparent; text-align: center; width: 100%; padding: 9px 4px; font: 600 17px/1.2 var(--f-body); font-variant-numeric: tabular-nums; min-width: 0; }
+.money { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding-right: 12px; }
+.money input { text-align: left; padding-left: 12px; }
+.money i { font-style: normal; color: var(--muted); }
+.stepper:focus-within, .money:focus-within { border-color: var(--accent); }
+input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; }
+.note { display: grid; gap: 6px; }
+.note > span { font-size: 13px; color: var(--muted); }
+textarea { width: 100%; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 10px 12px; resize: vertical; line-height: 1.45; }
+textarea:focus { border-color: var(--accent); outline: none; }
+.form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.save-msg { font-size: 13px; color: var(--muted); }
+.save-msg.warn { color: var(--warn); }
+.save-msg.bad { color: var(--bad); }
+.form-actions .push { margin-left: auto; }
+
+.side { display: grid; gap: 16px; }
+.mini-sum { display: grid; gap: 12px; }
+.mini-sum header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.mrow { display: grid; gap: 5px; }
+.mrow .top-line { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.mrow .top-line b { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* pills & bars */
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
+.pill.good { background: var(--good-soft); color: var(--good); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); }
+.pill.acc { background: var(--accent-soft); color: var(--accent); }
+.bar { position: relative; height: 6px; border-radius: 3px; background: var(--surface-2); }
+.bar i { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: var(--accent); }
+.bar b { position: absolute; top: -3px; width: 2px; height: 12px; background: var(--ink); opacity: .55; border-radius: 1px; transform: translateX(-1px); }
+.st-good .bar i, .mini.st-good i { background: var(--good); }
+.st-warn .bar i, .mini.st-warn i { background: var(--warn); }
+.st-bad .bar i, .mini.st-bad i { background: var(--bad); }
+
+/* period bar */
+.period-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.seg { display: inline-flex; background: var(--surface-2); padding: 3px; border-radius: 8px; }
+.seg button { border: 0; background: transparent; padding: 6px 14px; border-radius: 6px; cursor: pointer; color: var(--muted); font-weight: 500; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+.pnav { display: inline-flex; align-items: center; gap: 8px; }
+.plabel { font: 600 15px/1.2 var(--f-body); min-width: 150px; text-align: center; }
+.period-bar .grow { flex: 1; }
+
+/* summary */
+.sum { display: grid; gap: 16px; }
+.sum-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; font-size: 14px; }
+.sum-head .reports { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (min-width: 760px) { .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.t-label { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.t-label::after { content: ""; width: 7px; height: 7px; border-radius: 50%; background: transparent; }
+.tile.st-good .t-label::after { background: var(--good); }
+.tile.st-warn .t-label::after { background: var(--warn); }
+.tile.st-bad .t-label::after { background: var(--bad); }
+.t-val { font: 600 24px/1.15 var(--f-display); letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.t-plan { font-size: 12px; color: var(--muted); }
+.conv { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.conv div { background: var(--surface-2); border-radius: 8px; padding: 10px 12px; display: grid; gap: 2px; }
+.conv span { font-size: 12px; color: var(--muted); }
+.conv b { font: 600 16px/1.2 var(--f-body); font-variant-numeric: tabular-nums; }
+
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th { text-align: right; font: 500 11px/1.3 var(--f-mono); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { text-align: right; padding: 9px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+tr.total td { font-weight: 600; border-bottom: 0; background: var(--surface-2); }
+tr.off td { color: var(--muted); }
+tr.click { cursor: pointer; }
+tr.click:hover td { background: var(--accent-soft); }
+tr.sel td { background: var(--accent-soft); }
+td .of { color: var(--muted); font-size: 12px; margin-left: 3px; }
+.mini { height: 4px; border-radius: 2px; background: var(--surface-2); margin-top: 4px; position: relative; min-width: 70px; }
+.mini i { position: absolute; inset: 0 auto 0 0; border-radius: 2px; background: var(--accent); }
+.name-cell { display: flex; align-items: center; gap: 10px; }
+.name-cell img { width: 26px; height: 26px; border-radius: 50%; }
+
+.notes { display: grid; gap: 0; }
+.notes summary { cursor: pointer; font-weight: 600; padding-block: 4px; }
+.note-item { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.note-item:last-child { border-bottom: 0; }
+.note-item time { font: 500 12px/1.6 var(--f-mono); color: var(--muted); }
+.note-item p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* team */
+.detail { display: grid; gap: 18px; border-color: var(--accent); }
+.detail-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.detail-cols { display: grid; gap: 16px; }
+@media (min-width: 860px) { .detail-cols { grid-template-columns: 1fr 1fr; } }
+.sub { background: var(--surface-2); border: 0; display: grid; gap: 12px; }
+.plan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.plan-grid label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.plan-grid input { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--surface); color: var(--ink); width: 100%; font-variant-numeric: tabular-nums; }
+.rate-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; font-size: 14px; }
+.dots { display: inline-flex; gap: 4px; }
+.dots label { cursor: pointer; }
+.dots input { position: absolute; opacity: 0; pointer-events: none; }
+.dots span { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); font-weight: 600; font-variant-numeric: tabular-nums; }
+.dots input:checked + span { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.dots input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+details.card > summary { cursor: pointer; font-weight: 600; }
+details.card[open] > summary { margin-bottom: 14px; }
+.empty { text-align: center; padding: 36px 16px; display: grid; gap: 8px; justify-items: center; }
+.empty p { margin: 0; max-width: 52ch; color: var(--muted); }
+.label-card { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
+.label-card label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); flex: 1 1 220px; }
+.label-card input { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--surface); color: var(--ink); width: 100%; }
+
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 18px; border-radius: 8px; font-size: 14px; max-width: calc(100% - 32px); z-index: 10; }
+@media (prefers-reduced-motion: no-preference) { .bar i, .mini i { transition: width .35s ease; } }
+
+/* стажировка */
+a { color: var(--accent); text-underline-offset: 2px; }
+a.ext::after { content: " ↗"; font-size: .85em; }
+.ih { display: grid; gap: 14px; }
+.ih-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }
+.ih p { margin: 0; color: var(--muted); font-size: 14px; max-width: 70ch; }
+.prog-bar { height: 8px; border-radius: 4px; background: var(--surface-2); position: relative; overflow: hidden; }
+.prog-bar i { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: 4px; }
+.keydates { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.keydates div { background: var(--surface-2); border-radius: 8px; padding: 10px 12px; display: grid; gap: 2px; }
+.keydates span { font-size: 12px; color: var(--muted); }
+.keydates b { font-weight: 600; }
+.sec-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; }
+.chk-cat { padding-top: 16px; padding-bottom: 2px; }
+.chk-item { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 6px 12px; padding: 10px 0; border-bottom: 1px solid var(--line); align-items: start; font-size: 14px; }
+.chk-item:last-child { border-bottom: 0; }
+.chk-item input[type=checkbox] { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--accent); }
+.chk-item.done .chk-text { color: var(--muted); }
+.chk-extra { grid-column: 2; display: grid; gap: 6px; min-width: 0; }
+.chk-extra input { border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; background: var(--surface); color: var(--ink); width: 100%; }
+.chk-extra .lbl { font-size: 12px; color: var(--muted); }
+.chk-extra details summary { cursor: pointer; font-size: 13px; color: var(--accent); }
+.script { background: var(--surface-2); border-radius: 8px; padding: 10px 12px; font-size: 14px; white-space: pre-wrap; margin-top: 6px; }
+.projects { display: grid; gap: 18px; }
+@media (min-width: 760px) { .projects { grid-template-columns: 1fr 1fr; } }
+.proj-block { display: grid; gap: 8px; align-content: start; }
+.proj-row { display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: 8px; font-size: 14px; }
+.proj-row > span { font: 500 12px/1 var(--f-mono); color: var(--muted); }
+.proj-row input { border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; background: var(--surface); color: var(--ink); width: 100%; }
+details.week { padding: 0; }
+details.week > summary { list-style: none; padding: 16px 18px; cursor: pointer; display: grid; gap: 8px; }
+details.week > summary::-webkit-details-marker { display: none; }
+details.week[open] > summary { margin: 0; }
+.wk-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.wk-title h3 { font: 600 16px/1.2 var(--f-display); }
+.wk-title .chev { margin-left: auto; color: var(--muted); font-size: 13px; }
+.wk-stats { display: flex; flex-wrap: wrap; gap: 6px; }
+.pday { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 8px 16px; padding: 14px 18px; border-top: 1px solid var(--line); }
+@media (min-width: 860px) { .pday { grid-template-columns: 120px minmax(0, 1fr) 210px; } }
+.pday.today { background: var(--accent-soft); }
+.pd-date { display: grid; gap: 2px; align-content: start; }
+.pd-date b { font: 600 14px/1.3 var(--f-body); }
+.pd-date span { font-size: 12px; color: var(--muted); }
+.focus { margin: 0; white-space: pre-wrap; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.pd-tags { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 13px; color: var(--muted); }
+.pd-status { display: flex; flex-wrap: wrap; gap: 6px; align-content: start; align-items: center; grid-column: 2; }
+@media (min-width: 860px) { .pd-status { grid-column: auto; justify-content: flex-end; } }
+.prog { background: var(--accent-soft); border-radius: var(--r); padding: 14px 16px; display: grid; gap: 10px; }
+.prog .fld input { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--surface); color: var(--ink); width: 100%; }
+.chk { display: flex; gap: 10px; align-items: center; font-size: 14px; cursor: pointer; }
+.chk input { width: 18px; height: 18px; accent-color: var(--accent); }
+.rules { display: grid; gap: 16px; font-size: 14px; }
+.rules ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; }
+.setup { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+.setup label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.setup input { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--surface); color: var(--ink); }
+.two { display: grid; gap: 16px; }
+@media (min-width: 860px) { .two { grid-template-columns: 1fr 1fr; } }
+.kv { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; font-size: 14px; }
+.kv span { color: var(--muted); }
+.kv b { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.intern-detail { display: grid; gap: 16px; }
+</style>
+
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <h1>Дневник стажёра</h1>
+      <p class="who" id="who"></p>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Разделы">
+      <button id="tab-intern" role="tab" data-act="tab" data-v="intern" aria-selected="true">Стажировка</button>
+      <button id="tab-day" role="tab" data-act="tab" data-v="day" aria-selected="false">Мой день</button>
+      <button id="tab-mine" role="tab" data-act="tab" data-v="mine" aria-selected="false">Мой свод</button>
+      <button id="tab-team" role="tab" data-act="tab" data-v="team" aria-selected="false">Свод РОП</button>
+    </nav>
+  </header>
+
+  <div id="notice" class="notice" hidden></div>
+
+  <section id="view-intern" class="view" role="tabpanel">
+    <div class="card label-card" id="name-card" hidden>
+      <label for="my-name">Ваши фамилия и имя — так вас увидит руководитель в отчётах
+        <input id="my-name" maxlength="60" placeholder="Фамилия Имя">
+      </label>
+      <button type="button" class="btn primary sm" data-act="save-name">Сохранить</button>
+    </div>
+    <div class="card import" id="report-card">
+      <div class="sec-head"><h2>Отчёт руководителю</h2><span class="muted" id="saved-info" style="font-size:13px"></span></div>
+      <p class="muted" style="margin:0;font-size:14px">Отчёт дня сохраняется в этом браузере. Раз в неделю скачайте отчёт и отправьте его РОП в Telegram или на почту. Файл открывается в любом браузере, а РОП загружает его в свод.</p>
+      <div class="row">
+        <button type="button" class="btn primary sm" data-act="report-now">Скачать отчёт за неделю</button>
+        <button type="button" class="btn sm" data-act="backup">Резервная копия</button>
+        <label class="btn ghost sm" for="restore-file" tabindex="0">Восстановить из файла</label><input type="file" id="restore-file" accept=".html,.htm,.json" hidden>
+      </div>
+      <p class="muted" style="margin:0;font-size:12px">Открывайте дневник всегда в одном и том же браузере и не переносите файл: данные хранятся в браузере. Если они пропадут, восстановите их из последнего отчёта.</p>
+    </div>
+    <div class="card ih" id="intern-head"></div>
+    <div id="intern-today"></div>
+    <div class="card" id="intern-check"></div>
+    <div class="card" id="intern-projects"></div>
+    <div id="intern-program" style="display:grid;gap:12px"></div>
+    <div id="intern-results"></div>
+    <details class="card">
+      <summary>Как устроена программа</summary>
+      <div class="rules">
+        <div><h3>Кто ведёт</h3>С вами напрямую работает РОП. Программа — 4 недели (28 дней). Стажировка длится, пока вы не принесёте в компанию первую бронь.</div>
+        <div><h3>Правило недели</h3><ul>
+          <li>Понедельник–среда — обязательная практика по плану (звонки, ролёвки), работа с реальными клиентами.</li>
+          <li>Четверг/пятница — гибкое окно встречи с РОП. День выбирает РОП по факту загрузки. День, не занятый встречей, — изучение материала из раздела «До старта», работа с реальными клиентами.</li>
+          <li>Суббота — день без обязательных пунктов плана, индивидуальные поручения от РОП.</li>
+          <li>Воскресенье — выходной.</li></ul></div>
+        <div><h3>Ролевые отработки звонка</h3><ul>
+          <li>Дни 2–3, неделя 1: ролёвка с действующими брокерами команды — каждый раз новый партнёр, чтобы вы получили несколько разных стилей обратной связи, а не один шаблон.</li>
+          <li>Дни 8 и 15, недели 2–3: минимум 1 ролёвка с самим РОП, вторая на усмотрение РОП может быть проведена с ним или с действующим брокером.</li></ul></div>
+        <div><h3>Промежуточный экзамен по проектам — в два захода</h3><ul>
+          <li>Экзамен №1 (встреча №2, неделя 2) — первые 5 объектов.</li>
+          <li>Экзамен №2 (встреча №3, неделя 3) — вторые 5 объектов.</li>
+          <li>Итого квота на изучение — 10 проектов за месяц, распределены по двум контрольным точкам.</li></ul></div>
+        <div><h3>Как заполнять</h3><ul>
+          <li>Звонки, показы, ролёвку, материал и отметку заполняет стажёр по факту дня во вкладке «Мой день».</li>
+          <li>Отметка — выполнен план дня или нет.</li>
+          <li>«Встреча с РОП» отмечается только в тот день, когда встреча реально состоялась.</li>
+          <li>Итоги недели и месяца считаются автоматически.</li></ul></div>
+      </div>
+    </details>
+  </section>
+
+  <section id="view-day" class="view" role="tabpanel" hidden>
+    <div class="day-grid">
+      <div class="card form-card">
+        <div class="week-nav">
+          <button type="button" class="icon-btn" data-act="wk" data-v="-7" aria-label="Предыдущая неделя">‹</button>
+          <div class="week-title" id="wk-title"></div>
+          <button type="button" class="icon-btn" id="wk-next" data-act="wk" data-v="7" aria-label="Следующая неделя">›</button>
+        </div>
+        <div class="strip" id="strip"></div>
+        <div class="legend">
+          <span style="--c: var(--good)">отчёт есть</span>
+          <span style="--c: var(--bad)">рабочий день без отчёта</span>
+          <span style="--c: var(--muted)">не работал</span>
+        </div>
+        <form id="day-form" autocomplete="off">
+          <div style="display:grid;gap:16px">
+            <div class="form-head">
+              <h2 id="day-title"></h2>
+              <span class="pill" id="day-state"></span>
+            </div>
+            <div class="prog" id="prog-day" hidden>
+              <span class="eyebrow" id="pd-eyebrow"></span>
+              <p class="focus" id="pd-focus"></p>
+              <div class="pd-tags" id="pd-mat-wrap" style="margin:0;align-items:center"><span id="pd-mat"></span><label class="chk"><input type="checkbox" id="f-mat"> Изучил(а)</label></div>
+              <label class="fld" id="pd-rp-wrap"><span>Ролёвка: партнёр (ФИО)</span><input id="f-rp" maxlength="80"></label>
+              <label class="chk" id="pd-meet-wrap"><input type="checkbox" id="f-meet"> Встреча с РОП сегодня состоялась</label>
+              <label class="chk" id="pd-done-wrap"><input type="checkbox" id="f-done"> Отметка: план дня выполнен</label>
+            </div>
+            <label class="off-toggle"><input type="checkbox" id="f-off"> Не работал: выходной, отпуск или больничный</label>
+            <fieldset id="f-fields">
+              <div id="fields" style="display:grid;gap:18px"></div>
+              <label class="note"><span>Главный вывод дня</span>
+                <textarea id="f-note" rows="3" placeholder="Например: клиенты перебивали на квалификации. Завтра задаю больше вопросов и держу инициативу."></textarea>
+              </label>
+            </fieldset>
+            <div class="form-actions">
+              <button type="submit" class="btn primary" id="save-btn">Сохранить день</button>
+              <span id="save-msg" class="save-msg"></span>
+              <button type="button" class="btn ghost sm push" id="clear-btn" data-act="clear" hidden>Удалить запись</button>
+            </div>
+          </div>
+        </form>
+      </div>
+      <aside class="side">
+        <div class="card mini-sum" id="side-week"></div>
+        <div class="card mini-sum" id="side-month"></div>
+      </aside>
+    </div>
+  </section>
+
+  <section id="view-mine" class="view" role="tabpanel" hidden>
+    <div class="card label-card" id="label-card" hidden>
+      <label for="my-label">Как подписать вас в своде руководителя
+        <input id="my-label" maxlength="60" placeholder="Фамилия Имя">
+      </label>
+      <button type="button" class="btn sm" data-act="save-label">Сохранить</button>
+    </div>
+    <div class="period-bar" id="mine-period"></div>
+    <div id="mine-sum"></div>
+  </section>
+
+  <section id="view-team" class="view" role="tabpanel" hidden>
+    <div class="card import">
+      <h2>Свод РОП по отчётам брокеров</h2>
+      <p class="muted" style="margin:0;font-size:14px">Загрузите файлы-отчёты, которые прислали брокеры. Можно сразу несколько, можно перетащить на страницу. В каждом отчёте весь дневник брокера на момент выгрузки: свод по неделям и месяцам собирается из самого свежего файла.</p>
+      <div class="row"><label class="btn primary sm" for="rop-files" tabindex="0">Загрузить отчёты</label><input type="file" id="rop-files" accept=".html,.htm,.json" multiple hidden><span class="muted" id="rop-info" style="font-size:13px"></span></div>
+    </div>
+    <div class="period-bar" id="team-period"></div>
+    <div class="card" style="padding:6px 0 0">
+      <div class="table-wrap" id="team-table"></div>
+    </div>
+    <div id="team-detail"></div>
+  </section>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(() => {
+  // ---------- справочники ----------
+  const M = [
+    { k: "calls", label: "Звонки", g: "act" },
+    { k: "leads", label: "Новые лиды", g: "act" },
+    { k: "showsSet", label: "Показов назначено", g: "show" },
+    { k: "showsDone", label: "Показов проведено", g: "show" },
+    { k: "bookings", label: "Брони", g: "res" },
+    { k: "bookingSum", label: "Сумма броней", money: true, g: "res" },
+    { k: "deals", label: "Сделки", g: "res" },
+    { k: "commission", label: "Комиссия", money: true, g: "res" },
+  ];
+  const GROUPS = [["act", "Активность"], ["show", "Показы"], ["res", "Результат"]];
+  const PLAN_F = [
+    { k: "callsPerDay", metric: "calls", per: "day", label: "Звонков в рабочий день", def: 30 },
+    { k: "leadsPerWeek", metric: "leads", per: "week", label: "Новых лидов в неделю" },
+    { k: "showsDonePerWeek", metric: "showsDone", per: "week", label: "Проведённых показов в неделю" },
+    { k: "bookingsPerMonth", metric: "bookings", per: "month", label: "Броней в месяц" },
+    { k: "dealsPerMonth", metric: "deals", per: "month", label: "Сделок в месяц" },
+    { k: "commissionPerMonth", metric: "commission", per: "month", label: "Комиссия в месяц, ₽" },
+  ];
+  const COMP = [
+    ["engagement", "Увлечённость"], ["responsibility", "Ответственность"], ["initiative", "Инициативность"],
+    ["team", "Участие в жизни команды"], ["learning", "Посещаемость обучения"],
+  ];
+  const L = {
+    reg: "https://docs.google.com/document/d/1d2KCu4bl779wn47SAAEQNRZs5jacULW-bRVc1a0LzBI/edit?tab=t.0",
+    kdb: "https://docs.google.com/document/d/1_VJ8DFJHT67Si6M20VHTMvjQpE-UEN8vMINdZcxkJA0/edit?tab=t.0",
+    pre: "https://docs.google.com/document/d/1dLjxZ3g_KyaWICDbAYgXDHnLh4swVGjLPGFKn_Jlmh4/edit?tab=t.0",
+    stop: "https://docs.google.com/spreadsheets/d/1qAqE_B4LMr1qQNSx6ktpRBxDC8W4PR3zXM2MrYZ1zu4/edit?gid=0",
+    loc: "https://docs.google.com/spreadsheets/d/1T_o1LWevf73Xnt5BaYoTwZnHrseQIj02020eOYuONyc/edit?usp=sharing",
+    tg: "https://t.me/c/1980957567/1554",
+    fix: "https://drive.google.com/file/d/1c_HcdQ_TDBDAQoxO7SqGPGwZBkj2S9ps/view?usp=sharing",
+    lead: "https://docs.google.com/presentation/d/1UIz6ubBjA8AON4PwvPbi3WkzwhmmTb1GVcCwr1hTTf4/edit?usp=sharing",
+    btx: "https://docs.google.com/document/d/1RwuMJEf25881ExEjLArwpcMYNbdmPWO__840UZe3GO8/edit?usp=sharing",
+    self: "https://docs.google.com/document/d/1_3f4pLNFLSjPjS2JrEq7XnbJnZHmUUZDBWYAJsSSaLM/edit?usp=sharing",
+    obj: "https://docs.google.com/spreadsheets/d/1lVskG11H3iNlQGg59Og6VCQrSvWA_wz8w9yglTtiACk/edit?usp=sharing",
+    qual: "https://docs.google.com/document/d/1zmEIh9KYCZMmrfux--iJI0WQStajVIZyFm1tJaKJ1HU/edit?usp=sharing",
+    case1: "https://t.me/c/1980957567/6800/34095",
+    case2: "https://t.me/c/1980957567/6800/34865",
+    case3: "https://t.me/c/1980957567/6800/36160",
+  };
+  const HELLO = "Привет, меня зовут «Имя». Рад(а) стать частью команды Rich. Я новый сотрудник, рад(а) знакомству. Могу писать тебе по каким-либо рабочим вопросам?\n\nПо аналогии с этим скриптом можно написать любое своё сообщение. Цель — познакомиться с каждым и наладить коммуникацию для быстрой адаптации в команде.";
+  const CHECK = [
+    { id: "c01", cat: "Знакомство", pre: "Вводный тет-а-тет с руководителем" },
+    { id: "c02", cat: "Знакомство", pre: "Знакомство с командой на планёрке, написать каждому брокеру в личные сообщения", script: HELLO },
+    { id: "c03", cat: "Регламенты", pre: "Изучить", a: "общий лист регламентов", url: L.reg },
+    { id: "c04", cat: "Регламенты", pre: "Изучить регламент работы:", a: "Карта действий брокера", url: L.kdb },
+    { id: "c05", cat: "Регламенты", pre: "Изучить регламент показа:", a: "Предпоказ", url: L.pre },
+    { id: "c06", cat: "Регламенты", pre: "Изучить стоп-лист объектов Rich Group:", a: "Стоп-лист Rich Group", url: L.stop },
+    { id: "c07", cat: "Продукт", pre: "Запросить у руководителя список ТОП-10 объектов для изучения (5 к экзамену №1, 5 к экзамену №2) и сразу вписать его в блок «Проекты» ниже" },
+    { id: "c08", cat: "Регион", pre: "Посмотреть ещё раз видеообучение по локациям: Курс адаптации, Модуль 1, раздел по региону, на котором фокус. Дополнить свою таблицу", a: "Локации и объекты (шаблон для заполнения брокером)", url: L.loc, field: "Ссылка на свою таблицу" },
+    { id: "c09", cat: "Регион", pre: "Подписаться на", a: "каналы с партнёрами", url: L.tg, post: " (инфоповоды и изучение недвижимости)" },
+    { id: "c10", cat: "Клиенты", pre: "Посмотреть видео о фиксации клиентов:", a: "Обучение по фиксации клиентов", url: L.fix },
+    { id: "c11", cat: "Клиенты", pre: "Ознакомительный проход по документу", a: "Что делает брокер от лида до сделки (разбор)", url: L.lead, post: " — карта всего пути клиента" },
+    { id: "c12", cat: "Битрикс", pre: "Изучить", a: "Гайд по работе в Битрикс", url: L.btx, post: ": создание лида, источники, остановка автоматизации" },
+    { id: "c13", cat: "Битрикс", pre: "Изучить", a: "Гайд по работе в Битрикс", url: L.btx, post: ": создание сделки, обязательные поля" },
+    { id: "c14", cat: "Битрикс", pre: "Изучить", a: "Гайд по работе в Битрикс", url: L.btx, post: ": работа с задачами (срочные, важные, хештеги)" },
+    { id: "c15", cat: "Битрикс", pre: "Изучить", a: "Гайд по работе в Битрикс", url: L.btx, post: ": воронки продаж, карточка контакта" },
+    { id: "c16", cat: "Битрикс", pre: "Изучить", a: "Гайд по работе в Битрикс", url: L.btx, post: ": повторные заявки, правила работы" },
+    { id: "c17", cat: "Битрикс", pre: "Изучить", a: "Гайд по работе в Битрикс", url: L.btx, post: ": как отправить клиенту сообщение в мессенджер через Битрикс" },
+    { id: "c18", cat: "Битрикс", pre: "Изучить", a: "Гайд по работе в Битрикс", url: L.btx, post: ": мобильное приложение и его возможности" },
+    { id: "c19", cat: "Скрипты", pre: "Изучить и выучить скрипт «Продажа себя + вывод на показ»:", a: "«Продажа себя» (для новичка и эксперта)", url: L.self },
+    { id: "c20", cat: "Скрипты", pre: "Написать черновик: ТОП-20 преимуществ себя и компании + мини-презентация", field: "Ссылка на черновик" },
+    { id: "c21", cat: "Возражения", pre: "Изучить гайд по технике преодоления возражений (пригодится на неделе 2):", a: "Банк возражений", url: L.obj },
+  ];
+  const WEEKS = [
+    "Первые звонки, ролёвки с действующими брокерами, первый разбор кейсов.",
+    "Возражения, первые показы, документ о касаниях, экзамен по проектам №1.",
+    "Ролёвка с возражениями, полный цикл на реальных клиентах, экзамен по проектам №2.",
+    "Полный цикл на реальных клиентах, закрытие сделок в работе, финальные итоги месяца.",
+  ];
+  const SAT = "Свободная практика — звонки и работа с клиентами, поручения от РОП.";
+  const SUN = "Выходной.";
+  const FUNNEL = "Фокус дня: продвижение клиентов по стадиям воронки вправо.\nКачественная работа на всех этапах звонка с реальными клиентами, вывод клиентов на показ.";
+  const meetThu = (k, agenda, other) => `Гибкое окно встречи с РОП.\n\nЕсли встреча сегодня — повестка «Встреча №${k}»: ${agenda}\n\nЕсли встреча не сегодня — обычная практика: ${other}`;
+  const meetFri = (k, agenda, other) => `Гибкое окно встречи с РОП (если встреча не прошла в четверг).\n\nПовестка «Встреча №${k}»: ${agenda}\n\nЕсли встреча уже прошла в четверг — обычная практика: ${other}`;
+  const AG = [
+    "разбор звонков, обсуждение кейсов из «Разбор кейсов №1», корректировка.",
+    "промежуточный экзамен по проектам №1 (первые 5 объектов, принимает РОП), обсуждение кейсов из «Разбор кейсов №2», разбор звонков и показов, отчёт по плану касаний, корректировка.",
+    "промежуточный экзамен по проектам №2 (вторые 5 объектов, принимает РОП), проверка разбора кейсов №3, разбор звонков, показов, сделок в работе.",
+    "финальный разбор, итоги месяца.",
+  ];
+  const OT = [
+    "продолжение отработки звонка с реальными клиентами.",
+    "работа с возражениями на реальных звонках.",
+    "качественная работа на всех этапах звонка с реальными клиентами, вывод клиентов на показ.",
+    "качественная работа на всех этапах звонка с реальными клиентами, вывод клиентов на показ.",
+  ];
+  const PROGRAM = [
+    { focus: "Первый контакт с базой, знакомство с командой и руководителем.", mat: { pre: "Повторить:", a: "Вопросы для квалификации и выявления потребностей", url: L.qual } },
+    { focus: "1) Ролевая отработка звонка в Zoom с действующим брокером №1 (роль клиента):\nконтакт → квалификация и выявление потребности → закрытие на показ.\n\nОбратная связь от брокера фиксируется новичком письменно и применяется в звонках этого же дня.\n\n2) Подготовить 3 записи звонка реальному клиенту от 6 минут для разбора на встрече с РОП.", rp: "Действующий брокер №1" },
+    { focus: "Продолжение ролевой отработки звонка в Zoom с действующим брокером №2 (роль клиента): контакт → квалификация и выявление потребности → закрытие на показ. Обратная связь фиксируется письменно и применяется в звонках этого же дня.\n\nПросмотр видео «Разбор кейсов №1»: изучить, зафиксировать ключевые успешные действия брокеров, отметить то, что можно внедрить уже сейчас.", rp: "Действующий брокер №2", mat: { a: "Разбор кейсов №1", url: L.case1 } },
+    { focus: meetThu(1, AG[0], OT[0]), meet: 1 },
+    { focus: meetFri(1, AG[0], OT[0]), meet: 1 },
+    { focus: SAT, sat: 1 }, { focus: SUN, sun: 1 },
+    { focus: "Повторить гайд по технике преодоления возражений.\n\nРолевая отработка звонка в Zoom с РОП (роль клиента):\nконтакт → квалификация и выявление потребности → закрытие на показ → отработка возражений.\n\nФокус дня: работа с возражениями на реальных звонках.", rp: "РОП", mat: { a: "Банк возражений", url: L.obj } },
+    { focus: "Первые назначенные и проведённые показы.\n\nИзучить документ «Что делает брокер от лида до сделки» — зафиксировать ключевые действия, подготовить план касаний для реального клиента.\n\nПодготовить 3 записи звонка реальному клиенту от 6 минут для разбора на встрече с РОП.", mat: { a: "Что делает брокер от лида до сделки (разбор)", url: L.lead } },
+    { focus: "Фокус дня: работа с возражениями на реальных звонках.\n\nПросмотр видео «Разбор кейсов №2»: изучить, зафиксировать ключевые успешные действия брокеров, отметить то, что можно внедрить уже сейчас.", mat: { a: "Разбор кейсов №2", url: L.case2 } },
+    { focus: meetThu(2, AG[1], OT[1]), meet: 2 },
+    { focus: meetFri(2, AG[1], OT[1]), meet: 2 },
+    { focus: SAT, sat: 1 }, { focus: SUN, sun: 1 },
+    { focus: "Ролевая отработка звонка в Zoom с действующим брокером №3 (роль клиента):\nконтакт → квалификация и выявление потребности → закрытие на показ → отработка возражений.\n\nОбратная связь фиксируется и применяется.\n\nПодготовить 3 записи звонка от 6 минут реальному клиенту для разбора на встрече с РОП.", rp: "Действующий брокер №3" },
+    { focus: FUNNEL + "\n\nПросмотр видео «Разбор кейсов №3»: изучить, зафиксировать ключевые успешные действия брокеров, отметить то, что можно внедрить уже сейчас.", mat: { a: "Разбор кейсов №3", url: L.case3 } },
+    { focus: FUNNEL },
+    { focus: meetThu(3, AG[2], OT[2]), meet: 3 },
+    { focus: meetFri(3, AG[2], OT[2]), meet: 3 },
+    { focus: SAT, sat: 1 }, { focus: SUN, sun: 1 },
+    { focus: FUNNEL }, { focus: FUNNEL }, { focus: FUNNEL },
+    { focus: meetThu(4, AG[3], OT[3]), meet: 4 },
+    { focus: meetFri(4, AG[3], OT[3]), meet: 4 },
+    { focus: SAT, sat: 1 }, { focus: SUN, sun: 1 },
+  ].map((d, i) => ({ ...d, n: i + 1, calls: d.sat || d.sun ? 0 : 30 }));
+  const WD = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+  const MON = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+  const MONTH = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+  const MONTH_GEN = ["январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"];
+
+  // ---------- даты ----------
+  const pad = (n) => String(n).padStart(2, "0");
+  const ds = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const pd = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+  const addDays = (s, n) => { const d = pd(s); d.setDate(d.getDate() + n); return ds(d); };
+  const dow = (s) => (pd(s).getDay() + 6) % 7;
+  const monday = (s) => addDays(s, -dow(s));
+  const monthStart = (s) => s.slice(0, 8) + "01";
+  const monthEnd = (s) => { const d = pd(s); return ds(new Date(d.getFullYear(), d.getMonth() + 1, 0)); };
+  const shiftMonth = (s, n) => { const d = pd(s); return ds(new Date(d.getFullYear(), d.getMonth() + n, 1)); };
+  const isWorkday = (s) => dow(s) < 5;
+  const dayMon = (s) => `${pd(s).getDate()} ${MON[pd(s).getMonth()]}`;
+  const fmtDate = (s) => `${WD[dow(s)]}, ${dayMon(s)}`;
+  const rangeLabel = (a, b) => {
+    const A = pd(a), B = pd(b);
+    if (A.getMonth() === B.getMonth()) return `${A.getDate()}–${B.getDate()} ${MON[B.getMonth()]}`;
+    return `${dayMon(a)} – ${dayMon(b)}`;
+  };
+  const todayStr = () => ds(new Date());
+  const wdmCache = {};
+  const workdaysInMonth = (s) => {
+    const k = s.slice(0, 7);
+    if (wdmCache[k]) return wdmCache[k];
+    let n = 0;
+    for (let d = monthStart(s), e = monthEnd(s); d <= e; d = addDays(d, 1)) if (isWorkday(d)) n++;
+    return (wdmCache[k] = n);
+  };
+
+  // ---------- числа ----------
+  const nf = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 });
+  const nf1 = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 1 });
+  const num = (v) => (typeof v === "number" && isFinite(v) ? v : 0);
+  const isNum = (v) => typeof v === "number" && isFinite(v);
+  const parseNum = (s) => { const t = String(s ?? "").replace(/[^\d.,]/g, "").replace(",", "."); if (t === "") return null; const n = Number(t); return isFinite(n) ? n : null; };
+  const money = (v) => nf.format(Math.round(v)) + " ₽";
+  const moneyShort = (v) => {
+    const a = Math.abs(v);
+    if (a >= 1e6) return nf1.format(v / 1e6) + " млн ₽";
+    if (a >= 1e4) return nf.format(v / 1e3) + " тыс ₽";
+    return money(v);
+  };
+  const fmtV = (m, v, short) => (m.money ? (short ? moneyShort(v) : money(v)) : nf.format(Math.round(v)));
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const pct = (a, b) => (b > 0 ? Math.round((a / b) * 100) + "%" : "—");
+  const diffDays = (a, b) => Math.round((pd(b) - pd(a)) / 864e5);
+  const ln = (url, t) => `<a class="ext" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(t)}</a>`;
+  const userLink = (u) => (/^https?:\/\/\S+$/i.test(u) ? ln(u, u.length > 60 ? u.slice(0, 57) + "…" : u) : esc(u));
+  function firstWith(days, k, from) {
+    let r = null;
+    for (const [d, e] of Object.entries(days || {})) if ((!from || d >= from) && num(e?.[k]) > 0 && (!r || d < r)) r = d;
+    return r;
+  }
+  // День 1 программы — понедельник; если старт не в понедельник, до него идут вводные дни
+  const day1Of = (start) => start;
+  const INTRO = "Вводный день: блок «До старта» на вкладке «Стажировка» (регламенты, Битрикс, скрипты, проекты) и работа с реальными клиентами.";
+  // Стажёр — пока не внесена первая бронь (не раньше даты старта)
+  function internInfo(prof, days) {
+    const start = prof?.start || null;
+    if (!start) return { kind: "none", start: null };
+    const fb = firstWith(days, "bookings", start), d1 = day1Of(start);
+    return { kind: fb ? "grad" : "intern", start, d1, n: diffDays(d1, todayStr()) + 1, fb };
+  }
+
+  // ---------- состояние ----------
+  const LS_KEY = "rich-dnevnik-v1", ROP_KEY = "rich-dnevnik-rop-v1", DEFAULT_START = "2026-10-15";
+  const S = {
+    db: null, user: null, dl: null, uid: null, myName: "", editor: false, ready: false,
+    tab: "day", sel: todayStr(), dirty: false, pendingDate: null, clearArm: false,
+    myDays: {}, myLoaded: false, myProfile: null,
+    plans: {}, plansLoaded: false,
+    brokers: {}, daysBy: {}, subs: {}, ratings: {}, names: {}, avatars: {},
+    exams: {}, owner: false, ropStore: {}, savedAt: null, pq: Promise.resolve(), internPending: false,
+    mine: { mode: "week", anchor: todayStr() },
+    team: { mode: "month", anchor: todayStr(), sel: null },
+  };
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- план и расчёт ----------
+  function planFor(uid) {
+    const p = {};
+    for (const f of PLAN_F) {
+      const own = S.plans[uid]?.[f.k], def = S.plans._default?.[f.k];
+      p[f.k] = isNum(own) ? own : isNum(def) ? def : (f.def || 0);
+    }
+    return p;
+  }
+  function rateFor(f, plan, d) {
+    const v = num(plan[f.k]);
+    if (!v) return 0;
+    if (f.per === "day") return v;
+    if (f.per === "week") return v / 5;
+    return v / workdaysInMonth(d);
+  }
+  function calc(days, plan, a, b, from) {
+    const today = todayStr();
+    const r = { tot: {}, plan: {}, pace: {}, hit: 0, due: 0, notes: [], a, b };
+    M.forEach((m) => (r.tot[m.k] = 0));
+    PLAN_F.forEach((f) => { r.plan[f.metric] = 0; r.pace[f.metric] = 0; });
+    for (let d = a; d <= b; d = addDays(d, 1)) {
+      if (from && d < from) continue;
+      const e = days[d];
+      if (e) {
+        M.forEach((m) => (r.tot[m.k] += num(e[m.k])));
+        if (e.note && String(e.note).trim()) r.notes.push({ d, t: e.note });
+      }
+      if (isWorkday(d) && !(e && e.off)) {
+        for (const f of PLAN_F) {
+          const v = rateFor(f, plan, d);
+          r.plan[f.metric] += v;
+          if (d <= today) r.pace[f.metric] += v;
+        }
+        if (d <= today) { r.due++; if (e) r.hit++; }
+      }
+    }
+    r.notes.sort((x, y) => (x.d < y.d ? 1 : -1));
+    return r;
+  }
+  function status(fact, pace) {
+    if (!(pace > 0)) return "";
+    const q = fact / pace;
+    return q >= 1 ? "st-good" : q >= 0.8 ? "st-warn" : "st-bad";
+  }
+  const lastReport = (days) => Object.keys(days).sort().pop() || null;
+  function periodRange(p) {
+    if (p.mode === "week") { const a = monday(p.anchor); return [a, addDays(a, 6)]; }
+    return [monthStart(p.anchor), monthEnd(p.anchor)];
+  }
+  function periodLabel(p) {
+    const [a, b] = periodRange(p);
+    if (p.mode === "week") return `${rangeLabel(a, b)} ${pd(b).getFullYear()}`;
+    return `${MONTH[pd(a).getMonth()]} ${pd(a).getFullYear()}`;
+  }
+  function flatten(docs) {
+    const out = {};
+    for (const doc of docs) {
+      const days = doc.data()?.days || {};
+      for (const [k, v] of Object.entries(days)) if (v && typeof v === "object") out[k] = v;
+    }
+    return out;
+  }
+
+  // ---------- общие фрагменты ----------
+  const pill = (cls, t) => `<span class="pill ${cls}">${esc(t)}</span>`;
+  function periodBarHTML(p, id, extra = "") {
+    return `<div class="seg" role="group" aria-label="Период">
+      <button type="button" data-act="mode" data-p="${id}" data-v="week" aria-pressed="${p.mode === "week"}">Неделя</button>
+      <button type="button" data-act="mode" data-p="${id}" data-v="month" aria-pressed="${p.mode === "month"}">Месяц</button>
+    </div>
+    <div class="pnav">
+      <button type="button" class="icon-btn" data-act="pshift" data-p="${id}" data-v="-1" aria-label="Предыдущий период">‹</button>
+      <span class="plabel">${esc(periodLabel(p))}</span>
+      <button type="button" class="icon-btn" data-act="pshift" data-p="${id}" data-v="1" aria-label="Следующий период">›</button>
+    </div>
+    <button type="button" class="btn ghost sm" data-act="pnow" data-p="${id}">Текущий</button>
+    <span class="grow"></span>${extra}`;
+  }
+  function tileHTML(m, r) {
+    const f = PLAN_F.find((x) => x.metric === m.k);
+    const fact = r.tot[m.k], plan = f ? r.plan[m.k] : 0, pace = f ? r.pace[m.k] : 0;
+    const st = plan > 0 ? status(fact, pace) : "";
+    let line, bar = "";
+    if (!f) line = "без плана";
+    else if (!(plan > 0)) line = "план не задан";
+    else {
+      line = `план ${fmtV(m, plan, true)}` + (pace > 0 && pace < plan - 0.01 ? ` · к сегодня ${fmtV(m, pace, true)}` : "");
+      const w = Math.min(100, (fact / plan) * 100), t = Math.min(100, (pace / plan) * 100);
+      bar = `<div class="bar"><i style="width:${w.toFixed(1)}%"></i>${pace > 0 && pace < plan - 0.01 ? `<b style="left:${t.toFixed(1)}%"></b>` : ""}</div>`;
+    }
+    return `<div class="tile ${st}"><div class="t-label">${esc(m.label)}</div><div class="t-val" title="${esc(fmtV(m, fact))}">${esc(fmtV(m, fact, true))}</div><div class="t-plan">${esc(line)}</div>${bar}</div>`;
+  }
+  function rowCells(t) {
+    return `<td>${nf.format(t.calls)}</td><td>${nf.format(t.leads)}</td><td>${nf.format(t.showsSet)} / ${nf.format(t.showsDone)}</td><td>${nf.format(t.bookings)}</td><td>${esc(moneyShort(t.bookingSum))}</td><td>${nf.format(t.deals)}</td><td>${esc(moneyShort(t.commission))}</td>`;
+  }
+  const BREAK_HEAD = `<th>Звонки</th><th>Лиды</th><th>Показы н / п</th><th>Брони</th><th>Сумма броней</th><th>Сделки</th><th>Комиссия</th>`;
+
+  function summaryHTML(days, plan, p, from) {
+    const [a, b] = periodRange(p);
+    const r = calc(days, plan, a, b, from);
+    const today = todayStr();
+    const missed = r.due - r.hit;
+    const last = lastReport(days);
+    const head = `<div class="sum-head">
+      <div class="reports"><span class="eyebrow">Отчёты</span><strong>${r.hit} из ${r.due}</strong><span class="muted">рабочих дней${a > today ? "" : " к сегодняшнему дню"}</span>
+      ${r.due ? (missed > 0 ? pill("bad", `пропущено ${missed}`) : pill("good", "без пропусков")) : ""}</div>
+      <div class="muted">Последний отчёт: ${last ? esc(fmtDate(last)) : "ещё не было"}</div></div>`;
+    const tiles = `<div class="tiles">${M.map((m) => tileHTML(m, r)).join("")}</div>`;
+    const t = r.tot;
+    const conv = `<div class="conv">
+      <div><span>Показ состоялся</span><b>${pct(t.showsDone, t.showsSet)}</b></div>
+      <div><span>Бронь с показа</span><b>${pct(t.bookings, t.showsDone)}</b></div>
+      <div><span>Сделка из брони</span><b>${pct(t.deals, t.bookings)}</b></div>
+      <div><span>Звонков на 1 лид</span><b>${t.leads ? nf1.format(t.calls / t.leads) : "—"}</b></div>
+      <div><span>Средняя бронь</span><b>${t.bookings ? esc(moneyShort(t.bookingSum / t.bookings)) : "—"}</b></div></div>`;
+    let rows = "";
+    if (p.mode === "week") {
+      for (let d = a; d <= b; d = addDays(d, 1)) {
+        const e = days[d];
+        let st;
+        if (e && e.off) st = pill("", "не работал");
+        else if (e) st = pill("good", "есть");
+        else if (d > today || (from && d < from)) st = `<span class="muted">—</span>`;
+        else if (isWorkday(d)) st = pill("bad", "нет отчёта");
+        else st = `<span class="muted">выходной</span>`;
+        const tt = {}; M.forEach((m) => (tt[m.k] = num(e?.[m.k])));
+        rows += `<tr class="${e && e.off ? "off" : ""}"><td>${esc(fmtDate(d))}</td><td>${st}</td>${e && !e.off ? rowCells(tt) : `<td colspan="7" class="muted" style="text-align:center">—</td>`}</tr>`;
+      }
+    } else {
+      for (let w = monday(a); w <= b; w = addDays(w, 7)) {
+        const s = w < a ? a : w, e = addDays(w, 6) > b ? b : addDays(w, 6);
+        const rr = calc(days, plan, s, e, from);
+        const st = rr.due ? (rr.hit < rr.due ? pill("bad", `${rr.hit} / ${rr.due}`) : pill("good", `${rr.hit} / ${rr.due}`)) : `<span class="muted">—</span>`;
+        rows += `<tr><td>${esc(rangeLabel(s, e))}</td><td>${st}</td>${rowCells(rr.tot)}</tr>`;
+      }
+    }
+    rows += `<tr class="total"><td>Итого</td><td>${r.hit} / ${r.due}</td>${rowCells(r.tot)}</tr>`;
+    const table = `<div class="card" style="padding:6px 0 0"><div class="table-wrap"><table>
+      <thead><tr><th>${p.mode === "week" ? "День" : "Неделя"}</th><th>Отчёт</th>${BREAK_HEAD}</tr></thead><tbody>${rows}</tbody></table></div></div>`;
+    const notes = r.notes.length
+      ? `<details class="card notes" open><summary>Главные выводы за период · ${r.notes.length}</summary>${r.notes.map((n) => `<div class="note-item"><time>${esc(fmtDate(n.d))}</time><p>${esc(n.t)}</p></div>`).join("")}</details>`
+      : `<div class="card muted">Выводов дня за этот период пока нет.</div>`;
+    return `<div class="sum">${head}${tiles}${conv}${table}${notes}</div>`;
+  }
+
+  // ---------- Мой день ----------
+  function buildFields() {
+    $("fields").innerHTML = GROUPS.map(([g, title]) => `<div class="grp"><span class="eyebrow">${title}</span><div class="grp-fields">${
+      M.filter((m) => m.g === g).map((m) => m.money
+        ? `<label class="fld" for="f-${m.k}"><span>${m.label}, ₽</span><div class="money"><input id="f-${m.k}" inputmode="numeric" placeholder="0" data-money="1"><i>₽</i></div></label>`
+        : `<div class="fld"><span id="lbl-${m.k}">${m.label}</span><div class="stepper"><button type="button" data-act="step" data-k="${m.k}" data-v="-1" aria-label="Минус один">−</button><input id="f-${m.k}" type="number" min="0" step="1" inputmode="numeric" placeholder="0" aria-labelledby="lbl-${m.k}"><button type="button" data-act="step" data-k="${m.k}" data-v="1" aria-label="Плюс один">+</button></div></div>`
+      ).join("")}</div></div>`).join("");
+  }
+  function fillForm() {
+    const e = S.myDays[S.sel] || {};
+    M.forEach((m) => {
+      const el = $("f-" + m.k), v = e[m.k];
+      el.value = !isNum(v) || (v === 0 && (m.money || !e.at)) ? "" : (m.money ? nf.format(v) : String(v));
+    });
+    $("f-off").checked = !!e.off;
+    $("f-note").value = e.note || "";
+    $("f-rp").value = e.rp || ""; $("f-mat").checked = !!e.mat; $("f-meet").checked = !!e.meet; $("f-done").checked = !!e.done;
+    $("f-fields").disabled = !!e.off;
+    S.dirty = false; S.clearArm = false;
+    $("clear-btn").hidden = !S.myDays[S.sel];
+    $("clear-btn").textContent = "Удалить запись";
+    setSaveMsg(e.at ? `Сохранено ${new Date(e.at).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : "");
+  }
+  function readForm() {
+    const o = {};
+    M.forEach((m) => { const v = parseNum($("f-" + m.k).value); o[m.k] = v === null ? 0 : Math.max(0, m.money ? Math.round(v) : Math.round(v)); });
+    o.off = $("f-off").checked;
+    o.note = $("f-note").value.trim().slice(0, 2000);
+    o.rp = $("f-rp").value.trim().slice(0, 80);
+    o.mat = $("f-mat").checked; o.meet = $("f-meet").checked; o.done = $("f-done").checked;
+    o.at = new Date().toISOString();
+    return o;
+  }
+  function setSaveMsg(t, cls = "") { const el = $("save-msg"); el.textContent = t; el.className = "save-msg " + cls; }
+  function renderStrip() {
+    const today = todayStr();
+    const a = monday(S.sel), b = addDays(a, 6);
+    $("wk-title").textContent = `${rangeLabel(a, b)} ${pd(b).getFullYear()}`;
+    $("wk-next").disabled = addDays(a, 7) > today;
+    let h = "";
+    for (let d = a; d <= b; d = addDays(d, 1)) {
+      const e = S.myDays[d];
+      const cls = ["chip", e ? (e.off ? "off" : "filled") : (d < today && isWorkday(d) ? "missing" : ""), d === today ? "today" : ""].join(" ");
+      h += `<button type="button" class="${cls}" data-act="pick" data-v="${d}" aria-pressed="${d === S.sel}" ${d > today ? "disabled" : ""} aria-label="${esc(fmtDate(d))}"><span class="wd">${WD[dow(d)]}</span><span class="dn">${pd(d).getDate()}</span><span class="dot"></span></button>`;
+    }
+    $("strip").innerHTML = h;
+    $("day-title").textContent = (S.sel === today ? "Сегодня, " : "") + `${WD[dow(S.sel)].toLowerCase()} ${dayMon(S.sel)}`;
+    const e = S.myDays[S.sel];
+    const stEl = $("day-state");
+    stEl.className = "pill " + (e ? (e.off ? "" : "good") : "warn");
+    stEl.textContent = e ? (e.off ? "отмечен как нерабочий" : "отчёт сохранён") : "отчёт не заполнен";
+  }
+  function miniSum(title, sub, r) {
+    const keys = ["calls", "leads", "showsDone", "bookings", "deals"];
+    const rows = keys.map((k) => {
+      const m = M.find((x) => x.k === k), plan = r.plan[k] || 0, pace = r.pace[k] || 0, fact = r.tot[k];
+      const st = plan > 0 ? status(fact, pace) : "";
+      return `<div class="mrow ${st}"><div class="top-line"><span>${m.label}</span><b>${nf.format(fact)}${plan > 0 ? `<span class="muted" style="font-weight:400"> / ${nf.format(Math.round(plan))}</span>` : ""}</b></div>${plan > 0 ? `<div class="bar"><i style="width:${Math.min(100, (fact / plan) * 100).toFixed(1)}%"></i>${pace > 0 && pace < plan - 0.01 ? `<b style="left:${Math.min(100, (pace / plan) * 100).toFixed(1)}%"></b>` : ""}</div>` : ""}</div>`;
+    }).join("");
+    return `<header><h3>${esc(title)}</h3><span class="muted" style="font-size:12px">${esc(sub)}</span></header>${rows}
+      <div class="muted" style="font-size:12px">Отчёты: ${r.hit} из ${r.due} рабочих дней. Риска на шкале — где надо быть к сегодняшнему дню.</div>`;
+  }
+  function renderSide() {
+    const plan = planFor(S.uid || "_none");
+    const a = monday(S.sel), b = addDays(a, 6);
+    const from = S.myProfile?.start || S.myProfile?.since;
+    $("side-week").innerHTML = miniSum("Неделя", rangeLabel(a, b), calc(S.myDays, plan, a, b, from));
+    const ma = monthStart(S.sel), mb = monthEnd(S.sel);
+    $("side-month").innerHTML = miniSum(MONTH[pd(ma).getMonth()], `${workdaysInMonth(ma)} рабочих дней`, calc(S.myDays, plan, ma, mb, from));
+  }
+  function renderProgBlock() {
+    const info = internInfo(S.myProfile, S.myDays);
+    const n = info.start ? diffDays(info.d1, S.sel) + 1 : 0;
+    const intro = !!(info.start && S.sel >= info.start && S.sel < info.d1);
+    const box = $("prog-day");
+    box.hidden = !(info.start && ((n >= 1 && n <= 28) || intro));
+    if (box.hidden) return;
+    if (intro) {
+      const wd = dow(S.sel);
+      $("pd-eyebrow").textContent = `Стажировка · вводные дни · день 1 программы — ${fmtDate(info.d1)}`;
+      $("pd-focus").textContent = wd === 6 ? SUN : wd === 5 ? SAT : INTRO;
+      $("pd-mat-wrap").hidden = true; $("pd-rp-wrap").hidden = true; $("pd-meet-wrap").hidden = true;
+      $("pd-done-wrap").hidden = wd === 6;
+      return;
+    }
+    const day = PROGRAM[n - 1];
+    $("pd-eyebrow").textContent = `Программа стажировки · неделя ${Math.ceil(n / 7)} · день ${n}`;
+    $("pd-focus").textContent = day.focus;
+    $("pd-mat-wrap").hidden = !day.mat;
+    $("pd-mat").innerHTML = day.mat ? `${day.mat.pre ? esc(day.mat.pre) + " " : "Материал: "}${ln(day.mat.url, day.mat.a)}` : "";
+    $("pd-rp-wrap").hidden = !day.rp;
+    $("f-rp").placeholder = day.rp || "";
+    $("pd-meet-wrap").hidden = !day.meet;
+    $("pd-done-wrap").hidden = !!day.sun;
+  }
+  function renderDay() { renderStrip(); renderSide(); renderProgBlock(); if (!S.dirty) fillForm(); }
+
+  function saveDay() {
+    const date = S.sel, entry = readForm();
+    const prev = S.myDays;
+    S.myDays = { ...S.myDays, [date]: entry };
+    if (!S.myProfile) S.myProfile = { since: todayStr() };
+    if (!persist()) { S.myDays = prev; return; }
+    S.dirty = false;
+    renderDay();
+    toast(entry.off ? "День отмечен как нерабочий" : "День сохранён");
+  }
+  function clearDay() {
+    if (!S.clearArm) { S.clearArm = true; $("clear-btn").textContent = "Точно удалить? Нажмите ещё раз"; return; }
+    const copy = { ...S.myDays }; delete copy[S.sel]; S.myDays = copy;
+    persist(); S.dirty = false; renderDay(); toast("Запись удалена");
+  }
+  function pickDate(d) {
+    if (d === S.sel) return;
+    if (S.dirty && S.pendingDate !== d) { S.pendingDate = d; setSaveMsg("Изменения не сохранены. Сохраните или нажмите день ещё раз, чтобы уйти без сохранения.", "warn"); return; }
+    S.pendingDate = null; S.sel = d; S.dirty = false; renderDay();
+  }
+
+  // ---------- Стажировка ----------
+  function keydatesHTML(info, days) {
+    const f = (d) => (d ? esc(fmtDate(d)) + ` <span class="muted" style="font-weight:400">${pd(d).getFullYear()}</span>` : `<span class="muted" style="font-weight:400">ещё нет</span>`);
+    return `<div class="keydates">
+      <div><span>Начало стажировки</span><b>${f(info.start)}</b></div>
+      <div><span>День 1 программы</span><b>${f(info.d1)}</b></div>
+      <div><span>Первый показ</span><b>${f(firstWith(days, "showsDone", info.start))}</b></div>
+      <div><span>Первая бронь</span><b>${f(firstWith(days, "bookings", info.start))}</b></div>
+      <div><span>Первая сделка</span><b>${f(firstWith(days, "deals", info.start))}</b></div></div>`;
+  }
+  function setupHTML(cur) {
+    const def = S.plans._default?.internStart;
+    return `<div class="setup"><label for="start-date">Дата начала стажировки<input type="date" id="start-date" value="${esc(cur || def || todayStr())}"></label>
+      <button type="button" class="btn ${cur ? "" : "primary"} sm" data-act="start">${cur ? "Изменить дату" : def ? "Подтвердить старт" : "Начать стажировку"}</button></div>
+      <p>День 1 программы — понедельник. Если старт в другой день, дни до понедельника — вводные: блок «До старта» и звонки.</p>`;
+  }
+  function internHeadHTML(info, days, mine) {
+    if (info.kind === "none") {
+      const def = S.plans._default?.internStart;
+      return `<div class="ih-top"><h2>Стажировка · 4 недели</h2>${pill("", "не начата")}</div>
+        <p>Программа на 28 дней с РОП. Стажёр остаётся на стажировке, пока не принесёт в компанию первую бронь.${mine ? (def ? ` Руководитель назначил старт: ${esc(fmtDate(def))}. Подтвердите дату — программа разложится по календарю, а отчёт каждого дня покажет его задачи.` : " Выберите дату старта — программа разложится по календарю, а отчёт каждого дня покажет его задачи.") : ""}</p>
+        ${mine && S.db ? setupHTML("") : ""}`;
+    }
+    const n = info.n;
+    let title, badge, text;
+    if (info.kind === "grad") {
+      badge = pill("good", "Брокер"); title = `Стажировка завершена: первая бронь ${fmtDate(info.fb)}`;
+      text = "Дальше работа по дневнику: «Мой день» и «Мой свод».";
+    } else {
+      badge = pill("acc", "Стажёр");
+      title = todayStr() < info.start ? `Старт ${fmtDate(info.start)}` : n < 1 ? `Вводные дни · день 1 программы ${fmtDate(info.d1)}` : n <= 28 ? `Неделя ${Math.ceil(n / 7)}, день ${n} из 28` : `Программа пройдена · идёт день ${n}`;
+      text = n > 28 ? "Стажировка продолжается до первой брони. Работайте по дневнику и вносите брони в отчёт дня." : "Стажировка закончится с первой бронью: внесите её в отчёт дня, и статус сменится сам.";
+    }
+    const w = Math.max(0, Math.min(28, info.kind === "grad" ? 28 : n)) / 28 * 100;
+    return `<div class="ih-top"><h2>${esc(title)}</h2>${badge}</div>
+      <div class="prog-bar" role="img" aria-label="Пройдено ${Math.round(w)}% программы"><i style="width:${w.toFixed(1)}%"></i></div>
+      <p>${esc(text)}</p>${keydatesHTML(info, days)}
+      ${mine && S.db ? `<details><summary class="muted" style="cursor:pointer;font-size:13px">Изменить дату старта</summary><div style="display:grid;gap:8px;margin-top:10px">${setupHTML(info.start)}</div></details>` : ""}`;
+  }
+  function dayTags(day, e) {
+    const t = [];
+    if (day.mat) t.push(`<span>${day.mat.pre ? esc(day.mat.pre) + " " : ""}${ln(day.mat.url, day.mat.a)}${e?.mat ? " · изучено" : ""}</span>`);
+    if (day.rp) t.push(`<span>Ролёвка: ${esc(e?.rp || day.rp)}</span>`);
+    if (day.meet) t.push(`<span>Окно встречи №${day.meet}${e?.meet ? " · встреча состоялась" : ""}</span>`);
+    return t.length ? `<div class="pd-tags">${t.join("")}</div>` : "";
+  }
+  function todayCardHTML(info) {
+    const n = info.n, d = todayStr(), e = S.myDays[d];
+    if (n < 1 && d >= info.start) {
+      const wd = dow(d);
+      return `<div class="card prog" style="border:0"><div class="ih-top"><span class="eyebrow">Сегодня · вводный день</span>${e ? pill("good", "отчёт сохранён") : ""}</div>
+        <p class="focus">${esc(wd === 6 ? SUN : wd === 5 ? SAT : INTRO)}</p>
+        ${wd === 6 ? "" : `<div><button type="button" class="btn primary sm" data-act="goto" data-v="${d}">${e ? "Открыть отчёт дня" : "Заполнить отчёт дня"}</button></div>`}</div>`;
+    }
+    if (n < 1 || n > 28) return "";
+    const day = PROGRAM[n - 1];
+    return `<div class="card prog" style="border:0"><div class="ih-top"><span class="eyebrow">Сегодня по программе · день ${n}</span>${e ? pill("good", "отчёт сохранён") : ""}</div>
+      <p class="focus">${esc(day.focus)}</p>${dayTags(day, e)}
+      <div><button type="button" class="btn primary sm" data-act="goto" data-v="${d}">${e ? "Открыть отчёт дня" : "Заполнить отчёт дня"}</button></div></div>`;
+  }
+  function checklistHTML(prof, mine, pre) {
+    const ck = prof?.check || {};
+    const done = CHECK.filter((c) => ck[c.id]?.d).length;
+    let h = `<div class="sec-head"><h2>До старта</h2>${pill(done === CHECK.length ? "good" : "acc", `${done} из ${CHECK.length}`)}</div>
+      <p class="muted" style="margin:0 0 4px;font-size:14px">Разово, до дня 1 или по индивидуальному плану с РОП параллельно программе стажировки.</p>`;
+    let cat = "";
+    for (const c of CHECK) {
+      if (c.cat !== cat) { cat = c.cat; h += `<div class="chk-cat eyebrow">${esc(cat)}</div>`; }
+      const st = ck[c.id] || {}, id = `${pre}-${c.id}`;
+      const text = `${esc(c.pre)}${c.a ? " " + ln(c.url, c.a) : ""}${c.post ? esc(c.post) : ""}`;
+      let extra = "";
+      if (c.script) extra += `<details><summary>Пример сообщения</summary><div class="script">${esc(c.script)}</div>${mine ? `<button type="button" class="btn ghost sm" style="margin-top:6px" data-act="copy-hello">Скопировать текст</button>` : ""}</details>`;
+      if (c.field) extra += mine
+        ? `<label class="lbl" for="${id}-c">${esc(c.field)}</label><input id="${id}-c" data-ckc="${c.id}" value="${esc(st.c || "")}" placeholder="https://…" ${S.db ? "" : "disabled"}>${st.c ? `<span style="font-size:13px">${userLink(st.c)}</span>` : ""}`
+        : `<span class="lbl">${esc(c.field)}: ${st.c ? userLink(st.c) : "не добавлена"}</span>`;
+      h += `<div class="chk-item ${st.d ? "done" : ""}"><input type="checkbox" id="${id}" data-ck="${c.id}" ${st.d ? "checked" : ""} ${mine && S.db ? "" : "disabled"} aria-labelledby="${id}-t">
+        <div class="chk-text" id="${id}-t">${text}</div>${extra ? `<div class="chk-extra">${extra}</div>` : ""}</div>`;
+    }
+    return h;
+  }
+  function projectsHTML(prof, ex, mine) {
+    const pr = Array.isArray(prof?.projects) ? prof.projects : [];
+    const exam = (k, num1) => mine
+      ? `<label class="muted" style="font-size:13px">Экзамен №${num1}, из 5: <select data-exam="${k}" aria-label="Результат экзамена №${num1}"><option value="">не сдан</option>${[0, 1, 2, 3, 4, 5].map((n) => `<option value="${n}" ${ex?.[k] === n ? "selected" : ""}>${n}</option>`).join("")}</select></label>`
+      : (isNum(ex?.[k]) ? pill(ex[k] >= 4 ? "good" : ex[k] >= 3 ? "warn" : "bad", `Экзамен №${num1}: ${ex[k]} из 5`) : pill("", `Экзамен №${num1}: ещё не сдан`));
+    const block = (from, title, k, num1) => `<div class="proj-block"><div class="sec-head"><h3>${title}</h3>${exam(k, num1)}</div>${
+      [0, 1, 2, 3, 4].map((i) => {
+        const j = from + i, v = pr[j] || "";
+        return `<div class="proj-row"><span>${j + 1}</span>${mine ? `<input data-proj="${j}" value="${esc(v)}" maxlength="80" placeholder="Название ЖК" aria-label="Проект ${j + 1}" ${S.db ? "" : "disabled"}>` : `<div>${v ? esc(v) : '<span class="muted">не вписан</span>'}</div>`}</div>`;
+      }).join("")}</div>`;
+    const filled = pr.filter((x) => x && String(x).trim()).length;
+    return `<div class="sec-head"><h2>Проекты — квота на месяц</h2>${pill(filled === 10 ? "good" : "acc", `${filled} из 10 вписано`)}</div>
+      <p class="muted" style="margin:0 0 14px;font-size:14px">Список получить у РОП и сразу вписать сюда. Первые 5 — к экзамену №1 (встреча №2, неделя 2), вторые 5 — к экзамену №2 (встреча №3, неделя 3).</p>
+      <div class="projects">${block(0, "Блок 1 · к экзамену №1", "e1", 1)}${block(5, "Блок 2 · к экзамену №2", "e2", 2)}</div>`;
+  }
+  function programHTML(days, start, mine) {
+    const today = todayStr(), d1 = start ? day1Of(start) : null;
+    let h = "";
+    if (start && start < d1) {
+      let rows = "";
+      for (let d = start; d < d1; d = addDays(d, 1)) {
+        const e = days[d], wd = dow(d);
+        let status = "";
+        if (e && e.off) status = pill("", "не работал");
+        else if (e) status = pill(wd < 5 && num(e.calls) >= 30 ? "good" : "", `звонков ${nf.format(num(e.calls))}`) + (e.done ? pill("good", "отметка 1") : "");
+        else if (d <= today && wd < 5) status = pill(d === today ? "warn" : "bad", d === today ? "отчёт не заполнен" : "нет отчёта");
+        if (mine && d <= today && wd !== 6) status += `<button type="button" class="btn sm" data-act="goto" data-v="${d}">${e ? "Открыть" : "Заполнить"}</button>`;
+        rows += `<div class="pday ${d === today ? "today" : ""}"><div class="pd-date"><b>Вводный</b><span>${esc(fmtDate(d))}</span></div>
+          <div style="min-width:0"><p class="focus">${esc(wd === 6 ? SUN : wd === 5 ? SAT : INTRO)}</p></div><div class="pd-status">${status}</div></div>`;
+      }
+      h += `<details class="card week" ${today < d1 ? "open" : ""}><summary><div class="wk-title"><h3>Вводные дни</h3><span class="muted">${esc(rangeLabel(start, addDays(d1, -1)))}</span>${today >= start && today < d1 ? pill("acc", "сейчас") : ""}<span class="chev">развернуть / свернуть</span></div>
+        <div class="muted" style="font-size:14px">От старта стажировки до понедельника, когда начинается день 1 программы.</div></summary>${rows}</details>`;
+    }
+    for (let w = 0; w < 4; w++) {
+      const a = d1 ? addDays(d1, w * 7) : null, b = a ? addDays(a, 6) : null;
+      const cur = !!(a && today >= a && today <= b);
+      const open = cur || (w === 0 && (!d1 || today < d1));
+      const st = { calls: 0, plan: 0, set: 0, done: 0, rp: 0, mat: 0, meet: 0, mark: 0, rep: 0, due: 0 };
+      let rows = "";
+      for (let i = 0; i < 7; i++) {
+        const day = PROGRAM[w * 7 + i], d = a ? addDays(a, i) : null, e = d ? days[d] : null;
+        if (e) {
+          st.calls += num(e.calls); st.set += num(e.showsSet); st.done += num(e.showsDone);
+          if (e.rp) st.rp++; if (e.mat) st.mat++; if (e.meet) st.meet++; if (e.done) st.mark++;
+          st.rep++;
+        }
+        if (day.calls && !(e && e.off)) st.plan += day.calls;
+        let status = "";
+        if (d) {
+          if (e && e.off) status = pill("", "не работал");
+          else if (e) status = pill(day.calls && num(e.calls) >= day.calls ? "good" : "", `звонков ${nf.format(num(e.calls))}${day.calls ? " / " + day.calls : ""}`) + (e.done ? pill("good", "отметка 1") : day.sun ? "" : pill("warn", "отметка 0"));
+          else if (d > today) status = "";
+          else if (!day.sun && !day.sat) status = pill(d === today ? "warn" : "bad", d === today ? "отчёт не заполнен" : "нет отчёта");
+          if (mine && d <= today && !day.sun) status += `<button type="button" class="btn sm" data-act="goto" data-v="${d}">${e ? "Открыть" : "Заполнить"}</button>`;
+        }
+        rows += `<div class="pday ${d === today ? "today" : ""}"><div class="pd-date"><b>День ${day.n}</b><span>${d ? esc(fmtDate(d)) : WD[i]}</span></div>
+          <div style="min-width:0"><p class="focus">${esc(day.focus)}</p>${dayTags(day, e)}</div><div class="pd-status">${status}</div></div>`;
+      }
+      const stats = start ? `<div class="wk-stats">${pill(st.plan && st.calls >= st.plan ? "good" : "", `звонки ${nf.format(st.calls)} / ${nf.format(st.plan)}`)}${pill("", `показы ${st.set} назн. / ${st.done} пров.`)}${pill("", `ролёвки ${st.rp}`)}${pill("", `материалы ${st.mat}`)}${pill("", `встречи с РОП ${st.meet}`)}${pill("", `отметок 1: ${st.mark}`)}</div>` : "";
+      const repBtn = mine && a && a <= today ? `<button type="button" class="btn sm" data-act="report" data-a="${a}" data-b="${b}" data-l="Неделя ${w + 1}">Скачать отчёт недели</button>` : "";
+      h += `<details class="card week" ${open ? "open" : ""}><summary><div class="wk-title"><h3>Неделя ${w + 1}</h3>${repBtn}<span class="muted">${a ? esc(rangeLabel(a, b)) : `дни ${w * 7 + 1}–${w * 7 + 7}`}</span>${cur ? pill("acc", "сейчас") : ""}<span class="chev">развернуть / свернуть</span></div>
+        <div class="muted" style="font-size:14px">${esc(WEEKS[w])}</div>${stats}</summary>${rows}</details>`;
+    }
+    return h;
+  }
+  function resultsHTML(info, days, ex, uid) {
+    const end = info.fb || todayStr();
+    if (end < info.start) return "";
+    const r = calc(days, planFor(uid), info.start, end), t = r.tot;
+    const row = (l, v) => `<span>${l}</span><b>${v}</b>`;
+    return `<div class="card" style="display:grid;gap:14px"><div class="sec-head"><h2>Итоги стажировки</h2><span class="muted" style="font-size:13px">${esc(rangeLabel(info.start, end))} ${pd(end).getFullYear()}</span></div>
+      <div class="two"><div class="kv">${row("Кол-во новых лидов", nf.format(t.leads))}${row("Кол-во назначенных показов", nf.format(t.showsSet))}${row("Кол-во проведённых показов", nf.format(t.showsDone))}${row("Кол-во броней", nf.format(t.bookings))}${row("Кол-во закрытых сделок", nf.format(t.deals))}</div>
+      <div class="kv">${row("Общая сумма броней", esc(money(t.bookingSum)))}${row("Сумма комиссий", esc(money(t.commission)))}${row("Звонков всего", nf.format(t.calls))}${row("Экзамен №1 (из 5)", isNum(ex?.e1) ? ex.e1 : "—")}${row("Экзамен №2 (из 5)", isNum(ex?.e2) ? ex.e2 : "—")}</div></div></div>`;
+  }
+  function renderIntern() {
+    const ae = document.activeElement;
+    if (ae && $("view-intern").contains(ae) && ae.matches("input:not([type=checkbox]):not([type=radio]), textarea")) { S.internPending = true; return; }
+    S.internPending = false;
+    const prof = S.myProfile || {}, days = S.myDays, info = internInfo(prof, days);
+    $("intern-head").innerHTML = internHeadHTML(info, days, true);
+    $("intern-today").innerHTML = info.kind === "intern" ? todayCardHTML(info) : "";
+    $("intern-check").innerHTML = checklistHTML(prof, true, "me");
+    $("intern-projects").innerHTML = projectsHTML(prof, prof.exams, true);
+    $("intern-program").innerHTML = programHTML(days, info.start, true);
+    $("intern-results").innerHTML = info.start ? resultsHTML(info, days, prof.exams, S.uid || "_none") : "";
+    $("name-card").hidden = !!prof.label;
+    $("saved-info").textContent = S.savedAt ? `сохранено ${new Date(S.savedAt).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : "";
+  }
+  function internDetailHTML(id) {
+    const prof = S.brokers[id] || {}, days = S.daysBy[id] || {}, info = internInfo(prof, days);
+    if (info.kind === "none") return "";
+    return `<div class="intern-detail"><div class="card ih">${internHeadHTML(info, days, false)}</div>
+      <div class="two"><div class="card">${checklistHTML(prof, false, "rop")}</div><div class="card">${projectsHTML(prof, prof.exams, false)}</div></div>
+      <div style="display:grid;gap:12px">${programHTML(days, info.start, false)}</div>${resultsHTML(info, days, prof.exams, id)}</div>`;
+  }
+  function saveProfile(patch) {
+    const cur = S.myProfile || { since: todayStr() };
+    const merged = { ...cur, ...patch };
+    for (const k of ["check", "exams"]) if (patch[k]) {
+      merged[k] = { ...(cur[k] || {}) };
+      for (const [id, v] of Object.entries(patch[k])) merged[k][id] = v && typeof v === "object" ? { ...(cur[k]?.[id] || {}), ...v } : v;
+    }
+    S.myProfile = merged;
+    return Promise.resolve(persist());
+  }
+  async function startInternship() {
+    const v = $("start-date")?.value;
+    if (!v) { toast("Выберите дату старта"); return; }
+    const start = v;
+    if (await saveProfile({ start })) { toast(`День 1 стажировки: ${fmtDate(start)}`); render(); }
+  }
+
+  // ---------- Мой свод ----------
+  function renderMine() {
+    const [ma, mb] = periodRange(S.mine);
+    $("mine-period").innerHTML = periodBarHTML(S.mine, "mine", `<button type="button" class="btn primary sm" data-act="report" data-a="${ma}" data-b="${mb}" data-l="${S.mine.mode === "week" ? "Неделя" : "Месяц"}">Скачать отчёт за период</button>`);
+    $("mine-sum").innerHTML = summaryHTML(S.myDays, planFor(S.uid || "_none"), S.mine, S.myProfile?.start || S.myProfile?.since);
+    const lc = $("label-card");
+    lc.hidden = false;
+    if (!lc.hidden && document.activeElement !== $("my-label")) $("my-label").value = S.myProfile?.label || "";
+  }
+  async function saveLabel() {
+    const label = $("my-label").value.trim().slice(0, 60);
+    if (await saveProfile({ label })) { toast("Имя сохранено"); updateWho(); }
+  }
+
+  // ---------- Команда ----------
+  const nameOf = (id) => S.names[id] || S.brokers[id]?.label || "Без имени";
+  function teamIds() { return Object.keys(S.brokers).sort((x, y) => nameOf(x).localeCompare(nameOf(y), "ru")); }
+  async function refreshNames() {
+    if (!S.user) return;
+    const ids = Object.keys(S.brokers);
+    if (!ids.length) return;
+    try {
+      const ps = await S.user.profiles(ids);
+      let changed = false;
+      for (const id of ids) {
+        const n = ps[id]?.name || "";
+        if (S.names[id] !== n) { S.names[id] = n; changed = true; }
+        S.avatars[id] = ps[id]?.avatarUrl || "";
+      }
+      if (changed && S.tab === "team") renderTeam();
+    } catch {}
+  }
+  function planCell(fact, plan, pace, isMoney) {
+    const v = isMoney ? moneyShort(fact) : nf.format(fact);
+    if (!(plan > 0)) return `<td>${esc(v)}</td>`;
+    const st = status(fact, pace);
+    return `<td><span class="num">${esc(v)}</span><span class="of">/ ${esc(isMoney ? moneyShort(plan) : nf.format(Math.round(plan)))}</span><div class="mini ${st}"><i style="width:${Math.min(100, (fact / plan) * 100).toFixed(1)}%"></i></div></td>`;
+  }
+  function statusInfo(id) { return internInfo(S.brokers[id], S.daysBy[id] || {}); }
+  function statusText(i) {
+    if (i.kind === "none") return "брокер";
+    if (i.kind === "grad") return `бронь ${dayMon(i.fb)}`;
+    if (todayStr() < i.start) return `стажёр · старт ${dayMon(i.start)}`;
+    return i.n < 1 ? "стажёр · вводные дни" : `стажёр · день ${i.n}${i.n <= 28 ? "/28" : ""}`;
+  }
+  function statusCell(id) {
+    const i = statusInfo(id);
+    if (i.kind === "none") return `<span class="muted">брокер</span>`;
+    return pill(i.kind === "grad" ? "good" : i.n > 28 ? "warn" : "acc", statusText(i));
+  }
+  function renderTeam() {
+    const extra = `<button type="button" class="btn sm" data-act="csv" data-v="sum">Свод в CSV</button><button type="button" class="btn sm" data-act="csv" data-v="days">По дням в CSV</button>`;
+    $("team-period").innerHTML = periodBarHTML(S.team, "team", Object.keys(S.brokers).length ? extra : "");
+    const ids = teamIds();
+    if (!ids.length) {
+      $("team-table").innerHTML = `<div class="empty"><h2>Отчётов пока нет</h2>
+        <p>Отправьте брокеру этот файл. Раз в неделю он пришлёт вам отчёт — загрузите его кнопкой выше, и здесь появится свод по неделям и месяцам.</p></div>`;
+      $("team-detail").innerHTML = "";
+      return;
+    }
+    const [a, b] = periodRange(S.team);
+    const T = { tot: {}, plan: {}, pace: {}, hit: 0, due: 0 };
+    M.forEach((m) => (T.tot[m.k] = 0)); PLAN_F.forEach((f) => { T.plan[f.metric] = 0; T.pace[f.metric] = 0; });
+    let rows = "";
+    for (const id of ids) {
+      const days = S.daysBy[id] || {};
+      const r = calc(days, planFor(id), a, b, S.brokers[id]?.start || S.brokers[id]?.since);
+      M.forEach((m) => (T.tot[m.k] += r.tot[m.k])); PLAN_F.forEach((f) => { T.plan[f.metric] += r.plan[f.metric]; T.pace[f.metric] += r.pace[f.metric]; });
+      T.hit += r.hit; T.due += r.due;
+      const missed = r.due - r.hit;
+      const av = S.avatars[id] ? `<img src="${esc(S.avatars[id])}" alt="">` : "";
+      rows += `<tr class="click ${S.team.sel === id ? "sel" : ""}" data-act="sel" data-v="${esc(id)}" tabindex="0">
+        <td><div class="name-cell">${av}<span>${esc(nameOf(id))}</span></div></td>
+        <td>${statusCell(id)}</td>
+        <td>${r.due ? (missed > 0 ? pill("bad", `${r.hit} / ${r.due}`) : pill("good", `${r.hit} / ${r.due}`)) : "—"}</td>
+        ${planCell(r.tot.calls, r.plan.calls, r.pace.calls)}
+        ${planCell(r.tot.leads, r.plan.leads, r.pace.leads)}
+        <td>${nf.format(r.tot.showsSet)}</td>
+        ${planCell(r.tot.showsDone, r.plan.showsDone, r.pace.showsDone)}
+        ${planCell(r.tot.bookings, r.plan.bookings, r.pace.bookings)}
+        <td>${esc(moneyShort(r.tot.bookingSum))}</td>
+        ${planCell(r.tot.deals, r.plan.deals, r.pace.deals)}
+        ${planCell(r.tot.commission, r.plan.commission, r.pace.commission, true)}
+      </tr>`;
+    }
+    rows += `<tr class="total"><td>Команда · ${ids.length}</td><td></td><td>${T.hit} / ${T.due}</td>
+      ${planCell(T.tot.calls, T.plan.calls, T.pace.calls)}${planCell(T.tot.leads, T.plan.leads, T.pace.leads)}
+      <td>${nf.format(T.tot.showsSet)}</td>${planCell(T.tot.showsDone, T.plan.showsDone, T.pace.showsDone)}
+      ${planCell(T.tot.bookings, T.plan.bookings, T.pace.bookings)}<td>${esc(moneyShort(T.tot.bookingSum))}</td>
+      ${planCell(T.tot.deals, T.plan.deals, T.pace.deals)}${planCell(T.tot.commission, T.plan.commission, T.pace.commission, true)}</tr>`;
+    $("team-table").innerHTML = `<table><thead><tr><th>Брокер</th><th>Статус</th><th>Отчёты</th><th>Звонки</th><th>Лиды</th><th>Показы назн.</th><th>Показы пров.</th><th>Брони</th><th>Сумма броней</th><th>Сделки</th><th>Комиссия</th></tr></thead><tbody>${rows}</tbody></table>`;
+    renderDetailSum();
+  }
+  function renderDetailSum() {
+    const id = S.team.sel, box = $("team-detail");
+    if (!id || !S.brokers[id]) { box.innerHTML = ""; return; }
+    if (!$("detail-sum")) {
+      box.innerHTML = `<div class="card detail"><div class="detail-head"><div><span class="eyebrow">Брокер</span><h2 id="detail-name"></h2></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn ghost sm" data-act="rop-del">Убрать из свода</button><button type="button" class="btn sm" data-act="close">Закрыть</button></div></div>
+        <p class="muted" id="detail-src" style="margin:0;font-size:13px"></p><div id="detail-sum"></div><div id="detail-intern"></div></div>`;
+      renderEditors();
+    }
+    $("detail-name").textContent = nameOf(id);
+    const src = S.ropStore[id];
+    $("detail-src").textContent = src?.exportedAt ? `Последний отчёт выгружен ${new Date(src.exportedAt).toLocaleString("ru-RU", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}` : "";
+    $("detail-sum").innerHTML = summaryHTML(S.daysBy[id] || {}, planFor(id), S.team, S.brokers[id]?.start || S.brokers[id]?.since);
+    $("detail-intern").innerHTML = internDetailHTML(id);
+  }
+  function renderEditors() {}
+  async function exportCsv(kind) {
+    const [a, b] = periodRange(S.team), ids = teamIds();
+    const q = (v) => { const s = String(v ?? ""); return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+    const lines = [];
+    if (kind === "sum") {
+      lines.push(["Брокер", "Статус", "Период с", "по", "Отчётов", "Рабочих дней", "Звонки", "План звонков", "Лиды", "Показов назначено", "Показов проведено", "Брони", "Сумма броней", "Сделки", "Комиссия"].join(";"));
+      for (const id of ids) {
+        const r = calc(S.daysBy[id] || {}, planFor(id), a, b, S.brokers[id]?.start || S.brokers[id]?.since), t = r.tot;
+        lines.push([nameOf(id), statusText(statusInfo(id)), a, b, r.hit, r.due, t.calls, Math.round(r.plan.calls), t.leads, t.showsSet, t.showsDone, t.bookings, t.bookingSum, t.deals, t.commission].map(q).join(";"));
+      }
+    } else {
+      lines.push(["Брокер", "Дата", "Не работал", "Звонки", "Лиды", "Показов назначено", "Показов проведено", "Брони", "Сумма броней", "Сделки", "Комиссия", "Главный вывод дня"].join(";"));
+      for (const id of ids) {
+        const days = S.daysBy[id] || {};
+        for (let d = a; d <= b; d = addDays(d, 1)) {
+          const e = days[d]; if (!e) continue;
+          lines.push([nameOf(id), d, e.off ? 1 : 0, ...M.map((m) => num(e[m.k])), e.note || ""].map(q).join(";"));
+        }
+      }
+    }
+    downloadFile(`${kind === "sum" ? "Свод" : "По_дням"}_${a}_${b}.csv`, "\uFEFF" + lines.join("\r\n"), "text/csv;charset=utf-8");
+  }
+  // ---------- файлы: отчёт, копия, импорт ----------
+  function downloadFile(name, content, type) {
+    const url = URL.createObjectURL(new Blob([content], { type }));
+    const a = document.createElement("a");
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+  const fileSafe = (t) => String(t || "").replace(/[\\/:*?"<>|]+/g, "").trim().replace(/\s+/g, "_") || "без_имени";
+  function snapshotData(a, b) {
+    return { app: "rich-dnevnik", v: 1, id: S.uid, profile: S.myProfile || {}, days: S.myDays, exportedAt: new Date().toISOString(), period: a ? [a, b] : null };
+  }
+  const REPORT_CSS = `:root{color-scheme:light}*{box-sizing:border-box}body{margin:0;background:#F2F4F1;color:#18211D;font:15px/1.5 "Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1000px;margin:0 auto;padding:24px 16px 48px;display:grid;gap:18px}h1{margin:0;font-size:24px}h2{margin:0 0 8px;font-size:17px}.sub{margin:0;color:#5E6862}
+.card{background:#fff;border:1px solid #D6DBD4;border-radius:10px;padding:16px}.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.tile{background:#fff;border:1px solid #D6DBD4;border-radius:10px;padding:12px}.tile span{display:block;font-size:12px;color:#5E6862}.tile b{font-size:22px;font-variant-numeric:tabular-nums}.tile i{display:block;font-style:normal;font-size:12px;color:#5E6862}
+.wrap{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:7px 8px;border-bottom:1px solid #D6DBD4;text-align:right;white-space:nowrap;vertical-align:top}th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#5E6862}
+th:first-child,td:first-child,td.t,th.t{text-align:left}td.t{white-space:pre-wrap;min-width:220px}tr.total td{font-weight:600;background:#E9ECE7}.ok{color:#2E7A4D}.bad{color:#B03A32}.foot{font-size:13px;color:#5E6862}`;
+  function reportHTML(a, b, label) {
+    const prof = S.myProfile || {}, days = S.myDays, name = prof.label || "Без имени";
+    const info = internInfo(prof, days), r = calc(days, planFor("_me"), a, b, prof.start || prof.since), t = r.tot;
+    const today = todayStr();
+    let status = "Брокер";
+    if (info.kind === "intern") status = info.n < 1 ? `Стажёр · старт ${fmtDate(info.start)}` : `Стажёр · день ${info.n}${info.n <= 28 ? " из 28" : ""} (с ${fmtDate(info.start)})`;
+    if (info.kind === "grad") status = `Стажировка завершена: первая бронь ${fmtDate(info.fb)}`;
+    const ck = prof.check || {}, ckDone = CHECK.filter((c) => ck[c.id]?.d).length;
+    const pr = (prof.projects || []).filter((x) => x && String(x).trim()).length;
+    const ex = prof.exams || {};
+    const tile = (l, v, p) => `<div class="tile"><span>${esc(l)}</span><b>${esc(v)}</b>${p ? `<i>${esc(p)}</i>` : ""}</div>`;
+    let rows = "";
+    for (let d = a; d <= b; d = addDays(d, 1)) {
+      const e = days[d], n = info.start ? diffDays(info.start, d) + 1 : 0;
+      const dn = n >= 1 && n <= 28 ? `день ${n}` : "";
+      if (!e) { rows += `<tr><td>${esc(fmtDate(d))}${dn ? `<br><span class="foot">${dn}</span>` : ""}</td><td class="t ${d <= today && isWorkday(d) ? "bad" : ""}" colspan="13">${d > today ? "—" : "нет отчёта"}</td></tr>`; continue; }
+      if (e.off) { rows += `<tr><td>${esc(fmtDate(d))}</td><td class="t" colspan="13">не работал</td></tr>`; continue; }
+      rows += `<tr><td>${esc(fmtDate(d))}${dn ? `<br><span class="foot">${dn}</span>` : ""}</td><td>${nf.format(num(e.calls))}</td><td>${nf.format(num(e.leads))}</td><td>${nf.format(num(e.showsSet))} / ${nf.format(num(e.showsDone))}</td><td>${nf.format(num(e.bookings))}</td><td>${esc(money(num(e.bookingSum)))}</td><td>${nf.format(num(e.deals))}</td><td>${esc(money(num(e.commission)))}</td>
+        <td class="t" style="min-width:0">${esc(e.rp || "")}</td><td>${e.mat ? "да" : ""}</td><td>${e.meet ? "да" : ""}</td><td class="${e.done ? "ok" : ""}">${e.done ? "1" : "0"}</td><td class="t">${esc(e.note || "")}</td></tr>`;
+    }
+    rows += `<tr class="total"><td>Итого</td><td>${nf.format(t.calls)}</td><td>${nf.format(t.leads)}</td><td>${nf.format(t.showsSet)} / ${nf.format(t.showsDone)}</td><td>${nf.format(t.bookings)}</td><td>${esc(money(t.bookingSum))}</td><td>${nf.format(t.deals)}</td><td>${esc(money(t.commission))}</td><td colspan="5"></td></tr>`;
+    const json = JSON.stringify(snapshotData(a, b)).replace(/</g, "\\u003c");
+    return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(`Отчёт · ${name} · ${rangeLabel(a, b)}`)}</title><style>${REPORT_CSS}</style></head><body><main>
+<div><h1>Отчёт: ${esc(name)}</h1><p class="sub">${esc(label)} · ${esc(rangeLabel(a, b))} ${pd(b).getFullYear()} · выгружен ${esc(new Date().toLocaleString("ru-RU", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }))}</p><p class="sub">${esc(status)}</p></div>
+<div class="tiles">${tile("Звонки", nf.format(t.calls), r.plan.calls ? `план ${nf.format(Math.round(r.plan.calls))}` : "")}${tile("Новые лиды", nf.format(t.leads))}${tile("Показов назначено", nf.format(t.showsSet))}${tile("Показов проведено", nf.format(t.showsDone))}${tile("Брони", nf.format(t.bookings), money(t.bookingSum))}${tile("Сделки", nf.format(t.deals))}${tile("Комиссия", money(t.commission))}${tile("Отчёты", `${r.hit} из ${r.due}`, "рабочих дней")}</div>
+<div class="tiles">${tile("До старта", `${ckDone} из ${CHECK.length}`)}${tile("Проекты вписаны", `${pr} из 10`)}${tile("Экзамен №1", isNum(ex.e1) ? `${ex.e1} из 5` : "не сдан")}${tile("Экзамен №2", isNum(ex.e2) ? `${ex.e2} из 5` : "не сдан")}</div>
+<div class="card wrap"><h2>По дням</h2><table><thead><tr><th>День</th><th>Звонки</th><th>Лиды</th><th>Показы н / п</th><th>Брони</th><th>Сумма броней</th><th>Сделки</th><th>Комиссия</th><th class="t">Ролёвка</th><th>Материал</th><th>Встреча РОП</th><th>Отметка</th><th class="t">Главный вывод дня</th></tr></thead><tbody>${rows}</tbody></table></div>
+<p class="foot">Для свода: откройте файл «Дневник стажёра» → вкладка «Свод РОП» → «Загрузить отчёты» и выберите этот файл.</p>
+</main><script type="application/json" id="rich-dnevnik-data">${json}<\/script></body></html>`;
+  }
+  function sendReport(a, b, label) {
+    if (!S.myProfile?.label) { setTab("intern"); toast("Сначала впишите фамилию и имя"); $("my-name")?.focus(); return; }
+    downloadFile(`Отчёт_${fileSafe(S.myProfile.label)}_${a}_${b}.html`, reportHTML(a, b, label), "text/html;charset=utf-8");
+    toast("Файл скачан. Отправьте его руководителю.");
+  }
+  function currentReportPeriod() {
+    const info = internInfo(S.myProfile, S.myDays), today = todayStr();
+    if (info.start && info.n >= 1 && info.n <= 28) {
+      const w = Math.floor((info.n - 1) / 7), a = addDays(info.start, w * 7);
+      return [a, addDays(a, 6), `Неделя ${w + 1} стажировки`];
+    }
+    const a = monday(today);
+    return [a, addDays(a, 6), "Неделя"];
+  }
+  function parseData(text) {
+    let raw = text.trim();
+    if (!raw.startsWith("{")) {
+      const el = new DOMParser().parseFromString(text, "text/html").getElementById("rich-dnevnik-data");
+      if (!el) return null;
+      raw = el.textContent;
+    }
+    try { const d = JSON.parse(raw); return d && d.app === "rich-dnevnik" && d.id && d.days ? d : null; } catch { return null; }
+  }
+  const readText = (file) => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result)); fr.onerror = rej; fr.readAsText(file, "utf-8"); });
+  async function restoreFrom(file) {
+    const d = parseData(await readText(file).catch(() => ""));
+    if (!d) { toast("В этом файле нет данных дневника"); return; }
+    const days = { ...S.myDays };
+    for (const [k, v] of Object.entries(d.days)) if (!days[k] || String(v?.at || "") > String(days[k].at || "")) days[k] = v;
+    S.myDays = days;
+    S.myProfile = S.myProfile ? { ...d.profile, ...S.myProfile, check: { ...(d.profile?.check || {}), ...(S.myProfile.check || {}) } } : d.profile;
+    if (!Object.keys(S.myDays).length || S.uid !== d.id) S.uid = d.id;
+    persist(); updateWho(); render(); toast("Данные восстановлены");
+  }
+  function loadRop() { try { S.ropStore = JSON.parse(localStorage.getItem(ROP_KEY) || "{}") || {}; } catch { S.ropStore = {}; } applyRop(); }
+  function applyRop() {
+    S.brokers = {}; S.daysBy = {};
+    for (const [id, d] of Object.entries(S.ropStore)) { S.brokers[id] = d.profile || {}; S.daysBy[id] = d.days || {}; }
+  }
+  async function importReports(files) {
+    let ok = 0, bad = 0, newer = 0;
+    for (const f of files) {
+      const d = parseData(await readText(f).catch(() => ""));
+      if (!d) { bad++; continue; }
+      ok++;
+      const cur = S.ropStore[d.id];
+      if (!cur || String(d.exportedAt) >= String(cur.exportedAt)) { S.ropStore[d.id] = { profile: d.profile, days: d.days, exportedAt: d.exportedAt }; newer++; }
+    }
+    try { localStorage.setItem(ROP_KEY, JSON.stringify(S.ropStore)); } catch { toast("Браузер не дал сохранить свод"); }
+    applyRop();
+    $("rop-info").textContent = `Загружено: ${ok}${bad ? `, без данных дневника: ${bad}` : ""}${ok && newer < ok ? ". Более старые отчёты пропущены" : ""}.`;
+    if (S.tab === "team") renderTeam(); else setTab("team");
+  }
+
+  // ---------- навигация ----------
+  function setTab(t, persist = true) {
+    S.tab = t;
+    for (const v of ["intern", "day", "mine", "team"]) {
+      $("view-" + v).hidden = v !== t;
+      $("tab-" + v).setAttribute("aria-selected", String(v === t));
+    }
+    if (persist) { try { localStorage.setItem("bd-tab", t); } catch {} }
+    render();
+  }
+  function render() {
+    if (S.tab === "intern") renderIntern();
+    else if (S.tab === "day") renderDay();
+    else if (S.tab === "mine") renderMine();
+    else renderTeam();
+  }
+  let toastT;
+  function toast(t) { const el = $("toast"); el.textContent = t; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => (el.hidden = true), 2600); }
+
+  document.addEventListener("click", (ev) => {
+    const el = ev.target.closest("[data-act]");
+    if (!el || el.disabled) return;
+    const act = el.dataset.act, v = el.dataset.v;
+    const per = el.dataset.p === "team" ? S.team : S.mine;
+    switch (act) {
+      case "tab": setTab(v); break;
+      case "pick": pickDate(v); break;
+      case "wk": { const d = addDays(S.sel, Number(v)); pickDate(d > todayStr() ? todayStr() : d); break; }
+      case "step": { const inp = $("f-" + el.dataset.k); inp.value = String(Math.max(0, (parseNum(inp.value) || 0) + Number(v))); markDirty(); break; }
+      case "clear": clearDay(); break;
+      case "mode": per.mode = v; render(); if (el.dataset.p === "team") renderEditors(); break;
+      case "pshift": per.anchor = per.mode === "week" ? addDays(per.anchor, 7 * Number(v)) : shiftMonth(per.anchor, Number(v)); render(); if (el.dataset.p === "team") renderEditors(); break;
+      case "pnow": per.anchor = todayStr(); render(); if (el.dataset.p === "team") renderEditors(); break;
+      case "sel": S.team.sel = S.team.sel === v ? null : v; $("team-detail").innerHTML = ""; renderTeam(); if (S.team.sel) $("team-detail").scrollIntoView({ behavior: "smooth", block: "start" }); break;
+      case "close": S.team.sel = null; $("team-detail").innerHTML = ""; renderTeam(); break;
+      case "csv": exportCsv(v); break;
+      case "save-label": saveLabel(); break;
+      case "save-name": { const v = $("my-name").value.trim().slice(0, 60); if (!v) { toast("Впишите фамилию и имя"); break; } saveProfile({ label: v }).then(() => { toast("Сохранено"); updateWho(); render(); }); break; }
+      case "report": ev.preventDefault(); sendReport(el.dataset.a, el.dataset.b, el.dataset.l || "Отчёт"); break;
+      case "report-now": { const [a, b, l] = currentReportPeriod(); sendReport(a, b, l); break; }
+      case "backup": downloadFile(`Дневник_копия_${fileSafe(S.myProfile?.label)}_${todayStr()}.json`, JSON.stringify(snapshotData()), "application/json"); break;
+      case "rop-del":
+        if (el.dataset.arm !== "1") { el.dataset.arm = "1"; el.textContent = "Точно убрать? Нажмите ещё раз"; break; }
+        delete S.ropStore[S.team.sel]; try { localStorage.setItem(ROP_KEY, JSON.stringify(S.ropStore)); } catch {}
+        applyRop(); S.team.sel = null; $("team-detail").innerHTML = ""; renderTeam(); break;
+      case "goto": S.sel = v; S.dirty = false; S.pendingDate = null; setTab("day"); window.scrollTo({ top: 0, behavior: "smooth" }); break;
+      case "start": startInternship(); break;
+      case "copy-hello":
+        try { navigator.clipboard.writeText(HELLO.split("\n\n")[0]).then(() => toast("Текст скопирован"), () => toast("Выделите текст и скопируйте вручную")); }
+        catch { toast("Выделите текст и скопируйте вручную"); }
+        break;
+    }
+  });
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter" && ev.target.matches?.("tr[data-act=sel]")) ev.target.click();
+    if (ev.key === "Enter" && (ev.metaKey || ev.ctrlKey) && ev.target.closest?.("#day-form")) { ev.preventDefault(); saveDay(); }
+  });
+  document.addEventListener("change", (ev) => {
+    const t = ev.target;
+    if (t.dataset.ck) saveProfile({ check: { [t.dataset.ck]: { d: t.checked } } }).then(() => S.tab === "intern" && renderIntern());
+    else if (t.dataset.ckc) saveProfile({ check: { [t.dataset.ckc]: { c: t.value.trim().slice(0, 500) } } });
+    else if (t.dataset.exam) saveProfile({ exams: { [t.dataset.exam]: t.value === "" ? null : Number(t.value) } }).then(() => S.tab === "intern" && renderIntern());
+    else if (t.id === "rop-files" && t.files.length) { importReports(Array.from(t.files)); t.value = ""; }
+    else if (t.id === "restore-file" && t.files.length) { restoreFrom(t.files[0]); t.value = ""; }
+    else if (t.dataset.proj) {
+      const arr = Array.from({ length: 10 }, (_, i) => (document.querySelector(`#view-intern [data-proj="${i}"]`)?.value || "").trim().slice(0, 80));
+      saveProfile({ projects: arr });
+    }
+  });
+  $("view-intern").addEventListener("focusout", () => { setTimeout(() => { if (S.internPending && S.tab === "intern") renderIntern(); }, 0); });
+  function markDirty() { S.dirty = true; S.pendingDate = null; setSaveMsg("Есть несохранённые изменения", "warn"); }
+  $("day-form").addEventListener("input", (ev) => { if (ev.target.id === "f-off") $("f-fields").disabled = ev.target.checked; markDirty(); });
+  $("day-form").addEventListener("change", (ev) => { if (ev.target.id === "f-off") { $("f-fields").disabled = ev.target.checked; markDirty(); } });
+  $("day-form").addEventListener("focusout", (ev) => { if (ev.target.dataset?.money) { const v = parseNum(ev.target.value); ev.target.value = v ? nf.format(v) : ""; } });
+  $("day-form").addEventListener("submit", (ev) => { ev.preventDefault(); saveDay(); });
+  document.addEventListener("keydown", (ev) => { if ((ev.key === "Enter" || ev.key === " ") && ev.target.matches?.("label[for]")) { ev.preventDefault(); $(ev.target.htmlFor)?.click(); } });
+  $("view-team").addEventListener("dragover", (ev) => { ev.preventDefault(); $("view-team").classList.add("drop"); });
+  $("view-team").addEventListener("dragleave", () => $("view-team").classList.remove("drop"));
+  $("view-team").addEventListener("drop", (ev) => { ev.preventDefault(); $("view-team").classList.remove("drop"); if (ev.dataTransfer?.files?.length) importReports(Array.from(ev.dataTransfer.files)); });
+
+  // ---------- запуск ----------
+  function persist() {
+    S.savedAt = new Date().toISOString();
+    try { localStorage.setItem(LS_KEY, JSON.stringify(snapshotData())); return true; }
+    catch { toast("Браузер не дал сохранить. Проверьте, что сайтам разрешено хранить данные."); return false; }
+  }
+  function updateWho() { $("who").textContent = S.myProfile?.label ? `${S.myProfile.label} · ${statusText(internInfo(S.myProfile, S.myDays))}` : "Впишите фамилию и имя на вкладке «Стажировка»"; }
+  buildFields();
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(LS_KEY) || "null"); } catch {}
+  if (saved && saved.app === "rich-dnevnik") {
+    S.uid = saved.id; S.myProfile = saved.profile || null; S.myDays = saved.days || {}; S.savedAt = saved.exportedAt;
+  } else {
+    S.uid = "b-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    S.myProfile = { since: todayStr(), start: DEFAULT_START };
+    persist();
+  }
+  S.plans = { _default: { internStart: DEFAULT_START } };
+  S.ready = true; S.db = true;
+  loadRop();
+  updateWho();
+  let startTab = null;
+  try { startTab = localStorage.getItem("bd-tab"); } catch {}
+  if (!["intern", "day", "mine", "team"].includes(startTab)) startTab = null;
+  setTab(startTab || "intern", false);
+})();
+</script>
+</body>
+</html>
