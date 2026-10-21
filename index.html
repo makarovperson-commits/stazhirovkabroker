@@ -325,14 +325,12 @@ details.week[open] > summary { margin: 0; }
       <button type="button" class="btn primary sm" data-act="save-name">Сохранить</button>
     </div>
     <div class="card import" id="report-card">
-      <div class="sec-head"><h2>Отчёт руководителю</h2><span class="muted" id="saved-info" style="font-size:13px"></span></div>
-      <p class="muted" style="margin:0;font-size:14px">Отчёт дня сохраняется в этом браузере. Раз в неделю скачайте отчёт и отправьте его РОП в Telegram или на почту. Файл открывается в любом браузере, а РОП загружает его в свод.</p>
+      <div class="sec-head"><h2>Связь с руководителем</h2><span class="pill" id="sync-pill"></span></div>
+      <p class="muted" style="margin:0;font-size:14px" id="sync-text"></p>
       <div class="row">
-        <button type="button" class="btn primary sm" data-act="report-now">Скачать отчёт за неделю</button>
-        <button type="button" class="btn sm" data-act="backup">Резервная копия</button>
-        <label class="btn ghost sm" for="restore-file" tabindex="0">Восстановить из файла</label><input type="file" id="restore-file" accept=".html,.htm,.json" hidden>
+        <button type="button" class="btn sm" data-act="sync-now">Отправить сейчас</button>
+        <button type="button" class="btn ghost sm" data-act="report-now">Скачать отчёт за неделю</button>
       </div>
-      <p class="muted" style="margin:0;font-size:12px">Открывайте дневник всегда в одном и том же браузере и не переносите файл: данные хранятся в браузере. Если они пропадут, восстановите их из последнего отчёта.</p>
     </div>
     <div class="card ih" id="intern-head"></div>
     <div id="intern-today"></div>
@@ -427,10 +425,12 @@ details.week[open] > summary { margin: 0; }
   </section>
 
   <section id="view-team" class="view" role="tabpanel" hidden>
-    <div class="card import">
-      <h2>Свод РОП по отчётам брокеров</h2>
-      <p class="muted" style="margin:0;font-size:14px">Загрузите файлы-отчёты, которые прислали брокеры. Можно сразу несколько, можно перетащить на страницу. В каждом отчёте весь дневник брокера на момент выгрузки: свод по неделям и месяцам собирается из самого свежего файла.</p>
-      <div class="row"><label class="btn primary sm" for="rop-files" tabindex="0">Загрузить отчёты</label><input type="file" id="rop-files" accept=".html,.htm,.json" multiple hidden><span class="muted" id="rop-info" style="font-size:13px"></span></div>
+    <form class="card import" id="rop-login">
+      <h2>Свод РОП</h2>
+      <p class="muted" style="margin:0;font-size:14px">Отчёты брокеров приходят сюда сами, сразу после сохранения дня. Для просмотра нужен пароль РОП.</p>
+      <div class="row"><input type="password" id="rop-key" autocomplete="current-password" placeholder="Пароль РОП" aria-label="Пароль РОП" style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--surface);color:var(--ink)">
+        <button type="submit" class="btn primary sm">Показать свод</button><button type="button" class="btn ghost sm" data-act="rop-refresh">Обновить</button>
+        <span class="muted" id="rop-info" style="font-size:13px"></span></div>
     </div>
     <div class="period-bar" id="team-period"></div>
     <div class="card" style="padding:6px 0 0">
@@ -441,6 +441,7 @@ details.week[open] > summary { margin: 0; }
 </div>
 <div class="toast" id="toast" role="status" hidden></div>
 
+<script src="config.js"></script>
 <script>
 (() => {
   // ---------- справочники ----------
@@ -884,7 +885,8 @@ details.week[open] > summary { margin: 0; }
     const date = S.sel, entry = readForm();
     const prev = S.myDays;
     S.myDays = { ...S.myDays, [date]: entry };
-    if (!S.myProfile) S.myProfile = { since: todayStr() };
+    S.pend.days[date] = 1;
+    if (!S.myProfile) { S.myProfile = { since: todayStr() }; S.pend.profile = true; }
     if (!persist()) { S.myDays = prev; return; }
     S.dirty = false;
     renderDay();
@@ -892,7 +894,7 @@ details.week[open] > summary { margin: 0; }
   }
   function clearDay() {
     if (!S.clearArm) { S.clearArm = true; $("clear-btn").textContent = "Точно удалить? Нажмите ещё раз"; return; }
-    const copy = { ...S.myDays }; delete copy[S.sel]; S.myDays = copy;
+    const copy = { ...S.myDays }; delete copy[S.sel]; S.myDays = copy; S.pend.days[S.sel] = 1;
     persist(); S.dirty = false; renderDay(); toast("Запись удалена");
   }
   function pickDate(d) {
@@ -1056,6 +1058,7 @@ details.week[open] > summary { margin: 0; }
       <div class="kv">${row("Общая сумма броней", esc(money(t.bookingSum)))}${row("Сумма комиссий", esc(money(t.commission)))}${row("Звонков всего", nf.format(t.calls))}${row("Экзамен №1 (из 5)", isNum(ex?.e1) ? ex.e1 : "—")}${row("Экзамен №2 (из 5)", isNum(ex?.e2) ? ex.e2 : "—")}</div></div></div>`;
   }
   function renderIntern() {
+    if (typeof renderSync === "function") setTimeout(renderSync, 0);
     const ae = document.activeElement;
     if (ae && $("view-intern").contains(ae) && ae.matches("input:not([type=checkbox]):not([type=radio]), textarea")) { S.internPending = true; return; }
     S.internPending = false;
@@ -1067,7 +1070,6 @@ details.week[open] > summary { margin: 0; }
     $("intern-program").innerHTML = programHTML(days, info.start, true);
     $("intern-results").innerHTML = info.start ? resultsHTML(info, days, prof.exams, S.uid || "_none") : "";
     $("name-card").hidden = !!prof.label;
-    $("saved-info").textContent = S.savedAt ? `сохранено ${new Date(S.savedAt).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : "";
   }
   function internDetailHTML(id) {
     const prof = S.brokers[id] || {}, days = S.daysBy[id] || {}, info = internInfo(prof, days);
@@ -1083,7 +1085,7 @@ details.week[open] > summary { margin: 0; }
       merged[k] = { ...(cur[k] || {}) };
       for (const [id, v] of Object.entries(patch[k])) merged[k][id] = v && typeof v === "object" ? { ...(cur[k]?.[id] || {}), ...v } : v;
     }
-    S.myProfile = merged;
+    S.myProfile = merged; S.pend.profile = true;
     return Promise.resolve(persist());
   }
   async function startInternship() {
@@ -1149,7 +1151,7 @@ details.week[open] > summary { margin: 0; }
     const ids = teamIds();
     if (!ids.length) {
       $("team-table").innerHTML = `<div class="empty"><h2>Отчётов пока нет</h2>
-        <p>Отправьте брокеру этот файл. Раз в неделю он пришлёт вам отчёт — загрузите его кнопкой выше, и здесь появится свод по неделям и месяцам.</p></div>`;
+        <p>${S.ropKey ? "Брокеры появятся здесь после первого сохранения в дневнике." : "Введите пароль РОП выше."}</p></div>`;
       $("team-detail").innerHTML = "";
       return;
     }
@@ -1191,13 +1193,13 @@ details.week[open] > summary { margin: 0; }
     if (!id || !S.brokers[id]) { box.innerHTML = ""; return; }
     if (!$("detail-sum")) {
       box.innerHTML = `<div class="card detail"><div class="detail-head"><div><span class="eyebrow">Брокер</span><h2 id="detail-name"></h2></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn ghost sm" data-act="rop-del">Убрать из свода</button><button type="button" class="btn sm" data-act="close">Закрыть</button></div></div>
+        <button type="button" class="btn sm" data-act="close">Закрыть</button></div>
         <p class="muted" id="detail-src" style="margin:0;font-size:13px"></p><div id="detail-sum"></div><div id="detail-intern"></div></div>`;
       renderEditors();
     }
     $("detail-name").textContent = nameOf(id);
     const src = S.ropStore[id];
-    $("detail-src").textContent = src?.exportedAt ? `Последний отчёт выгружен ${new Date(src.exportedAt).toLocaleString("ru-RU", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}` : "";
+    $("detail-src").textContent = src?.exportedAt ? `Последнее обновление ${new Date(src.exportedAt).toLocaleString("ru-RU", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}` : "";
     $("detail-sum").innerHTML = summaryHTML(S.daysBy[id] || {}, planFor(id), S.team, S.brokers[id]?.start || S.brokers[id]?.since);
     $("detail-intern").innerHTML = internDetailHTML(id);
   }
@@ -1303,6 +1305,8 @@ th:first-child,td:first-child,td.t,th.t{text-align:left}td.t{white-space:pre-wra
     S.myDays = days;
     S.myProfile = S.myProfile ? { ...d.profile, ...S.myProfile, check: { ...(d.profile?.check || {}), ...(S.myProfile.check || {}) } } : d.profile;
     if (!Object.keys(S.myDays).length || S.uid !== d.id) S.uid = d.id;
+    for (const k of Object.keys(S.myDays)) S.pend.days[k] = 1;
+    S.pend.profile = true;
     persist(); updateWho(); render(); toast("Данные восстановлены");
   }
   function loadRop() { try { S.ropStore = JSON.parse(localStorage.getItem(ROP_KEY) || "{}") || {}; } catch { S.ropStore = {}; } applyRop(); }
@@ -1322,7 +1326,7 @@ th:first-child,td:first-child,td.t,th.t{text-align:left}td.t{white-space:pre-wra
     try { localStorage.setItem(ROP_KEY, JSON.stringify(S.ropStore)); } catch { toast("Браузер не дал сохранить свод"); }
     applyRop();
     $("rop-info").textContent = `Загружено: ${ok}${bad ? `, без данных дневника: ${bad}` : ""}${ok && newer < ok ? ". Более старые отчёты пропущены" : ""}.`;
-    if (S.tab === "team") renderTeam(); else setTab("team");
+    if (S.tab === "team") renderTeam();
   }
 
   // ---------- навигация ----------
@@ -1364,6 +1368,8 @@ th:first-child,td:first-child,td.t,th.t{text-align:left}td.t{white-space:pre-wra
       case "save-label": saveLabel(); break;
       case "save-name": { const v = $("my-name").value.trim().slice(0, 60); if (!v) { toast("Впишите фамилию и имя"); break; } saveProfile({ label: v }).then(() => { toast("Сохранено"); updateWho(); render(); }); break; }
       case "report": ev.preventDefault(); sendReport(el.dataset.a, el.dataset.b, el.dataset.l || "Отчёт"); break;
+      case "sync-now": flush(); break;
+      case "rop-refresh": loadAll(); break;
       case "report-now": { const [a, b, l] = currentReportPeriod(); sendReport(a, b, l); break; }
       case "backup": downloadFile(`Дневник_копия_${fileSafe(S.myProfile?.label)}_${todayStr()}.json`, JSON.stringify(snapshotData()), "application/json"); break;
       case "rop-del":
@@ -1406,30 +1412,100 @@ th:first-child,td:first-child,td.t,th.t{text-align:left}td.t{white-space:pre-wra
   $("view-team").addEventListener("drop", (ev) => { ev.preventDefault(); $("view-team").classList.remove("drop"); if (ev.dataTransfer?.files?.length) importReports(Array.from(ev.dataTransfer.files)); });
 
   // ---------- запуск ----------
-  function persist() {
+  const API = String(window.DNEVNIK_API || "").trim();
+  function persist(noSync) {
     S.savedAt = new Date().toISOString();
-    try { localStorage.setItem(LS_KEY, JSON.stringify(snapshotData())); return true; }
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ ...snapshotData(), token: S.token, pend: S.pend })); }
     catch { toast("Браузер не дал сохранить. Проверьте, что сайтам разрешено хранить данные."); return false; }
+    if (!noSync) { clearTimeout(S.syncT); S.syncT = setTimeout(flush, 600); }
+    return true;
   }
+  async function api(body) {
+    const r = await fetch(API, { method: "POST", body: JSON.stringify(body) });
+    return r.json();
+  }
+  async function flush() {
+    if (!API) { S.sync = "off"; renderSync(); return; }
+    const dates = Object.keys(S.pend.days);
+    if (!dates.length && !S.pend.profile) { renderSync(); return; }
+    if (S.syncing) { clearTimeout(S.syncT); S.syncT = setTimeout(flush, 1500); return; }
+    S.syncing = true; S.sync = "busy"; renderSync();
+    const days = {}; for (const d of dates) days[d] = S.myDays[d] || null;
+    try {
+      const res = await api({ action: "save", id: S.uid, token: S.token, profile: S.myProfile || {}, days });
+      if (!res.ok) throw new Error(res.error || "error");
+      for (const d of dates) delete S.pend.days[d];
+      S.pend.profile = false; S.sync = "ok"; S.syncAt = new Date().toISOString();
+      persist(true);
+    } catch (e) { S.sync = String(e?.message) === "token" ? "token" : "err"; }
+    S.syncing = false; renderSync();
+  }
+  function renderSync() {
+    const pill_ = $("sync-pill"), txt = $("sync-text");
+    if (!pill_) return;
+    const n = Object.keys(S.pend.days).length + (S.pend.profile ? 1 : 0);
+    const t = (iso) => new Date(iso).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+    let cls = "good", p = "всё отправлено", m = "Каждый сохранённый день сразу уходит руководителю. Ничего пересылать не нужно.";
+    if (S.sync === "off") { cls = "warn"; p = "не настроено"; m = "Связь с руководителем ещё не настроена. Данные сохраняются в этом браузере и уйдут, когда связь появится."; }
+    else if (S.sync === "busy") { cls = "acc"; p = "отправляем…"; }
+    else if (S.sync === "token") { cls = "bad"; p = "ошибка доступа"; m = "Таблица не принимает данные с этого устройства. Сообщите руководителю."; }
+    else if (S.sync === "err" || n) { cls = "warn"; p = `не отправлено: ${n}`; m = "Нет связи. Данные сохранены в браузере, отправим при следующем сохранении или по кнопке «Отправить сейчас»."; }
+    if (S.sync === "ok" && S.syncAt && !n) m += ` Последняя отправка: ${t(S.syncAt)}.`;
+    pill_.className = "pill " + cls; pill_.textContent = p; txt.textContent = m;
+  }
+  async function loadAll(quiet) {
+    if (!API) { $("rop-info").textContent = "Хранилище ещё не подключено."; return; }
+    if (!S.ropKey) return;
+    if (!quiet) $("rop-info").textContent = "Загружаем…";
+    try {
+      const res = await api({ action: "all", key: S.ropKey });
+      if (!res.ok) {
+        $("rop-info").textContent = res.error === "password" ? "Неверный пароль." : "Не удалось загрузить свод.";
+        if (res.error === "password") { S.ropKey = ""; try { localStorage.removeItem("rich-rop-key"); } catch {} }
+        return;
+      }
+      S.ropStore = {};
+      for (const [id, b] of Object.entries(res.brokers || {})) S.ropStore[id] = { profile: b.profile || {}, days: b.days || {}, exportedAt: b.updated };
+      applyRop();
+      $("rop-info").textContent = `Обновлено в ${new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })} · брокеров: ${Object.keys(S.ropStore).length}`;
+      if (S.tab === "team") renderTeam();
+    } catch { $("rop-info").textContent = "Нет связи с таблицей. Попробуйте обновить."; }
+  }
+  $("rop-login").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    S.ropKey = $("rop-key").value.trim();
+    try { localStorage.setItem("rich-rop-key", S.ropKey); } catch {}
+    loadAll();
+  });
+  setInterval(() => { if (S.tab === "team" && !document.hidden) loadAll(true); }, 60000);
   function updateWho() { $("who").textContent = S.myProfile?.label ? `${S.myProfile.label} · ${statusText(internInfo(S.myProfile, S.myDays))}` : "Впишите фамилию и имя на вкладке «Стажировка»"; }
   buildFields();
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(LS_KEY) || "null"); } catch {}
+  const rnd = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (x) => x.toString(16).padStart(2, "0")).join("");
+  S.pend = { days: {}, profile: false };
   if (saved && saved.app === "rich-dnevnik") {
     S.uid = saved.id; S.myProfile = saved.profile || null; S.myDays = saved.days || {}; S.savedAt = saved.exportedAt;
+    S.token = saved.token || rnd();
+    if (saved.pend) S.pend = { days: saved.pend.days || {}, profile: !!saved.pend.profile };
+    if (!saved.token) { S.pend.profile = true; for (const k of Object.keys(S.myDays)) S.pend.days[k] = 1; }
   } else {
-    S.uid = "b-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    S.uid = "b-" + rnd().slice(0, 12); S.token = rnd();
     S.myProfile = { since: todayStr(), start: DEFAULT_START };
-    persist();
+    S.pend.profile = true;
+    persist(true);
   }
+  try { S.ropKey = localStorage.getItem("rich-rop-key") || ""; } catch { S.ropKey = ""; }
   S.plans = { _default: { internStart: DEFAULT_START } };
   S.ready = true; S.db = true;
-  loadRop();
+  S.ropStore = {}; applyRop();
   updateWho();
   let startTab = null;
   try { startTab = localStorage.getItem("bd-tab"); } catch {}
   if (!["intern", "day", "mine", "team"].includes(startTab)) startTab = null;
   setTab(startTab || "intern", false);
+  flush();
+  if (S.ropKey) loadAll();
 })();
 </script>
 </body>
