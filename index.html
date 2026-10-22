@@ -441,7 +441,7 @@ details.week[open] > summary { margin: 0; }
 </div>
 <div class="toast" id="toast" role="status" hidden></div>
 
-<script src="config.js"></script>
+<script src="config.js?v=3"></script>
 <script>
 (() => {
   // ---------- справочники ----------
@@ -1412,7 +1412,7 @@ th:first-child,td:first-child,td.t,th.t{text-align:left}td.t{white-space:pre-wra
   $("view-team").addEventListener("drop", (ev) => { ev.preventDefault(); $("view-team").classList.remove("drop"); if (ev.dataTransfer?.files?.length) importReports(Array.from(ev.dataTransfer.files)); });
 
   // ---------- запуск ----------
-  const API = String(window.DNEVNIK_API || "").trim();
+  const API = String(window.DNEVNIK_API || "https://script.google.com/macros/s/AKfycbzBtPAyEbxmGEM4yJ6Z2LKcUgG3A5dlFE9V7JNkmeCXVR_tHS8ODRjJHFWWGUK2Ebhe/exec").trim();
   function persist(noSync) {
     S.savedAt = new Date().toISOString();
     try { localStorage.setItem(LS_KEY, JSON.stringify({ ...snapshotData(), token: S.token, pend: S.pend })); }
